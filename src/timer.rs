@@ -8,10 +8,10 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn new() -> Self {
+    pub fn new(time: u64) -> Self {
         Self {
             started: Instant::now(),
-            counter: 0,
+            counter: time,
             running: true,
         }
     }

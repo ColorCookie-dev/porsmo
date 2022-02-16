@@ -22,11 +22,15 @@ pub trait Counter {
 
     fn check_end(&self) -> bool;
 
+    fn after_end(&self) -> Result<()> {
+        Ok(())
+    }
+
     fn count(&mut self) -> Result<u64> {
         let mut stdout = &mut TermRawMode::new().stdout;
         let receiver = listen_for_inputs();
 
-        while !self.check_end() {
+        loop {
             match receiver.try_recv() {
                 Ok(Command::Quit) => {
                     break;
@@ -49,6 +53,11 @@ pub trait Counter {
 
             show_view(&mut stdout, self.counter(), self.is_running())?;
             thread::sleep(Duration::from_millis(500));
+
+            if self.check_end() {
+                self.after_end()?;
+                break;
+            }
         }
 
         Ok(self.counter())

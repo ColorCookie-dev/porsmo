@@ -1,4 +1,7 @@
 use crate::counter::Counter;
+use crate::notification::notify_default;
+use crate::sound::play_bell;
+use anyhow::Result;
 use std::time::Instant;
 
 pub struct Countdown {
@@ -24,6 +27,11 @@ impl Counter for Countdown {
         } else {
             self.counter == 0
         }
+    }
+
+    fn after_end(&self) -> Result<()> {
+        notify_default("Countdown ended!", "Your Porsmo Countdown Ended")?;
+        play_bell()
     }
 
     fn is_running(&self) -> bool {

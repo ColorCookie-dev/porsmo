@@ -2,6 +2,8 @@ mod countdown;
 mod counter;
 mod format;
 mod input;
+mod notification;
+mod sound;
 mod terminal;
 mod timer;
 
@@ -20,21 +22,32 @@ use clap::{AppSettings, Parser, Subcommand};
 )]
 #[clap(global_setting(AppSettings::PropagateVersion))]
 #[clap(global_setting(AppSettings::UseLongFormatForHelpSubcommand))]
-struct App {
-    #[clap(subcommand)]
+struct Cli {
+    #[clap(subcommand, name = "mode")]
     mode: Modes,
 }
 
 #[derive(Subcommand)]
 enum Modes {
-    Timer,
-    Countdown { time: u64 },
+    /// timer, counts up until you tell it to stop
+    #[clap(name = "timer")]
+    Timer {
+        #[clap(default_value_t = 0)]
+        /// Lets you start timer from a particular time
+        time: u64,
+    },
+    /// countdown, counts down until you tell it to stop, or it ends
+    #[clap(name = "cd")]
+    Countdown {
+        #[clap(default_value_t = 25*60)]
+        time: u64,
+    },
 }
 
 fn main() -> Result<()> {
-    let args = App::parse();
+    let args = Cli::parse();
     match args.mode {
-        Modes::Timer => Timer::new()
+        Modes::Timer { time } => Timer::new(time)
             .count()
             .map(|counter| println!("{}", fmt_time(counter))),
         Modes::Countdown { time } => Countdown::new(time)
