@@ -9,7 +9,7 @@ mod timer;
 
 use crate::format::fmt_time;
 use crate::{countdown::Countdown, counter::Counter, timer::Timer};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::{AppSettings, Parser, Subcommand};
 
 #[derive(Parser)]
@@ -32,14 +32,18 @@ enum Modes {
     /// timer, counts up until you tell it to stop
     #[clap(name = "timer")]
     Timer {
-        #[clap(default_value_t = 0)]
+        #[clap(parse(try_from_str=parse_time),
+               default_value_t = 0,
+               value_name = "time")]
         /// Lets you start timer from a particular time
         time: u64,
     },
     /// countdown, counts down until you tell it to stop, or it ends
     #[clap(name = "cd")]
     Countdown {
-        #[clap(default_value_t = 25*60)]
+        #[clap(parse(try_from_str=parse_time),
+               default_value_t = 25*60,
+               value_name = "time")]
         time: u64,
     },
 }
@@ -54,4 +58,30 @@ fn main() -> Result<()> {
             .count()
             .map(|counter| println!("{}", fmt_time(counter))),
     }
+}
+
+fn parse_time(time_str: &str) -> Result<u64> {
+    let mut secs = 0u64;
+
+    for (i, e) in time_str.split(':').rev().enumerate() {
+        if e.is_empty() {
+            continue;
+        }
+
+        let en = e.parse::<u64>()?;
+
+        if i == 0 {
+            secs += en;
+        } else if i == 1 {
+            secs += en * 60;
+        } else if i == 2 {
+            secs += en * 60 * 60;
+        } else if i == 3 {
+            secs += en * 3600 * 24;
+        } else {
+            bail!("Bad number of ':'");
+        }
+    }
+
+    Ok(secs)
 }

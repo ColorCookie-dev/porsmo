@@ -2,6 +2,10 @@
 name = "porsmo"
 version = "0.1.0"
 edition = "2021"
+readme = "README.org"
+description = "A pomodoro and time and countdown, all in one app"
+keywords = ["cli", "pomodoro", "timer", "countdown"]
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

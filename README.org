@@ -1,0 +1,23 @@
+#+TITLE: Readme
+
+* Project Goal
+- Personal project
+- All in one with good accuracy
+  - Timer
+  - Countdown
+  - Pomodoro
+
+* Roadmap
+** In immediate future
+*** DONE Add direct time input
+*** Add pomodoro feature
+**** TODO Break timer
+**** TODO Work timer
+**** TODO Sessions (rounds of 4 block)
+** Someday
+*** TODO Tracking
+**** TODO Tracking pomodoro sessions and resume feature
+**** TODO Tracking timer data in a file
+*** TODO reading config for pomodoro timers in a file
+** I'll think about it
+*** Server and GUI client or inbuild gui
