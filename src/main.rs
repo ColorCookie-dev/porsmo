@@ -10,7 +10,7 @@ mod timer;
 use crate::format::fmt_time;
 use crate::{countdown::Countdown, counter::Counter, timer::Timer};
 use anyhow::{bail, Result};
-use clap::{AppSettings, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[clap(
@@ -20,8 +20,6 @@ use clap::{AppSettings, Parser, Subcommand};
     about = "Timer and Countdown and Pomodoro",
     long_about = None,
 )]
-#[clap(global_setting(AppSettings::PropagateVersion))]
-#[clap(global_setting(AppSettings::UseLongFormatForHelpSubcommand))]
 struct Cli {
     #[clap(subcommand, name = "mode")]
     mode: Modes,
