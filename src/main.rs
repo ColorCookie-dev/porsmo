@@ -8,6 +8,8 @@ mod terminal;
 mod timer;
 
 use crate::format::fmt_time;
+use crate::notification::notify_default;
+use crate::sound::play_bell;
 use crate::{countdown::Countdown, counter::Counter, timer::Timer};
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
@@ -52,10 +54,18 @@ fn main() -> Result<()> {
         Modes::Timer { time } => Timer::new(time)
             .count()
             .map(|counter| println!("{}", fmt_time(counter))),
-        Modes::Countdown { time } => Countdown::new(time)
-            .count()
-            .map(|counter| println!("{}", fmt_time(counter))),
+        Modes::Countdown { time } => Countdown::new(time).count().map(|counter| {
+            if counter == 0 {
+                after_end().expect("failed to notify or sound the end of countdown!");
+            }
+            println!("{}", fmt_time(counter))
+        }),
     }
+}
+
+fn after_end() -> Result<()> {
+    notify_default("Countdown ended!", "Your Porsmo Countdown Ended")?;
+    play_bell()
 }
 
 fn parse_time(time_str: &str) -> Result<u64> {

@@ -10,7 +10,7 @@
 * Roadmap
 ** In immediate future
 *** DONE Add direct time input
-*** TODO Add short and long command for subcommand
+*** DONE Add short and long command for subcommand
 *** Add pomodoro feature
 **** TODO Break timer
 **** TODO Work timer
