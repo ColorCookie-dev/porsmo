@@ -28,7 +28,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Modes {
     /// timer, counts up until you tell it to stop
-    #[clap(name = "timer")]
+    #[clap(name = "timer", alias = "t")]
     Timer {
         #[clap(parse(try_from_str=parse_time),
                default_value_t = 0,
@@ -37,7 +37,7 @@ enum Modes {
         time: u64,
     },
     /// countdown, counts down until you tell it to stop, or it ends
-    #[clap(name = "cd")]
+    #[clap(name = "countdown", alias = "c")]
     Countdown {
         #[clap(parse(try_from_str=parse_time),
                default_value_t = 25*60,
