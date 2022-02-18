@@ -85,19 +85,23 @@ fn main() -> Result<()> {
         Some(Modes::Timer { time }) => Timer::new(time)
             .count()
             .map(|counter| println!("{}", fmt_time(counter))),
+
         Some(Modes::Countdown { time }) => Countdown::new(time).count().map(|counter| {
             if counter == 0 {
                 after_end().expect("failed to notify or sound the end of countdown!");
             }
             println!("{}", fmt_time(counter))
         }),
+
         Some(Modes::Pomodoro { mode }) => match mode {
             Some(PomoMode::Short) | None => Pomodoro::new(25 * 60, 5 * 60, 10 * 60)
                 .count()
                 .map(|counter| println!("{}", fmt_time(counter))),
+
             Some(PomoMode::Long) => Pomodoro::new(55 * 60, 10 * 60, 20 * 60)
                 .count()
                 .map(|counter| println!("{}", fmt_time(counter))),
+
             Some(PomoMode::Custom {
                 work_time,
                 break_time,
@@ -106,6 +110,7 @@ fn main() -> Result<()> {
                 .count()
                 .map(|counter| println!("{}", fmt_time(counter))),
         },
+
         None => Pomodoro::new(25 * 60, 5 * 60, 10 * 60)
             .count()
             .map(|counter| println!("{}", fmt_time(counter))),
@@ -149,17 +154,14 @@ mod tests {
     #[test]
     fn test_parse_time() -> Result<()> {
         let ok_cases = vec![
+            ("", 0),
+            (":", 0),
+            ("::10", 10),
             ("1020", 1020),
             ("2:000092", 2 * 60 + 92),
             ("2:", 2 * 60),
-            ("::10", 10),
-            ("", 0),
-            (":", 0),
-            ("::", 0),
-            (":::", 0),
+            ("2:2:2", (2 * 60 + 2) * 60 + 2),
             ("1:::", 1 * 24 * 60 * 60),
-            ("::::", 0),
-            (":::::", 0),
         ];
 
         for (inp, out) in ok_cases.iter() {

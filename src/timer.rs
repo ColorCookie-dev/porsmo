@@ -54,7 +54,7 @@ impl Counter for Timer {
     }
 
     fn resume(&mut self) {
-        if !self.is_paused() {
+        if self.is_paused() {
             self.status = Status::Running;
             self.started = Instant::now();
         }
