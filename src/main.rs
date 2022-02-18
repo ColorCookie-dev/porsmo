@@ -26,7 +26,7 @@ use clap::{Parser, Subcommand};
 )]
 struct Cli {
     #[clap(subcommand, name = "mode")]
-    mode: Modes,
+    mode: Option<Modes>,
 }
 
 #[derive(Subcommand)]
@@ -48,19 +48,32 @@ enum Modes {
                value_name = "time")]
         time: u64,
     },
-    /// pomodoro, for all you productivity needs
+    /// pomodoro, for all you productivity needs (default)
     #[clap(name = "pomodoro", alias = "p")]
     Pomodoro {
+        #[clap(subcommand, name = "mode")]
+        mode: Option<PomoMode>,
+    },
+}
+
+#[derive(Subcommand)]
+enum PomoMode {
+    /// short pomodoro, with 25, 5, 10 min values (default)
+    #[clap(name = "short", alias = "-s")]
+    Short,
+    /// long pomodoro, with 55, 10, 20 min values
+    #[clap(name = "long", alias = "-l")]
+    Long,
+    /// custom pomodoro, with any specified values
+    #[clap(name = "custom", alias = "-c")]
+    Custom {
         #[clap(parse(try_from_str=parse_time),
-               default_value_t = 25*60,
                value_name = "work time")]
         work_time: u64,
         #[clap(parse(try_from_str=parse_time),
-               default_value_t = 5*60,
                value_name = "break time")]
         break_time: u64,
         #[clap(parse(try_from_str=parse_time),
-               default_value_t = 20*60,
                value_name = "long break time")]
         long_break_time: u64,
     },
@@ -69,20 +82,31 @@ enum Modes {
 fn main() -> Result<()> {
     let args = Cli::parse();
     match args.mode {
-        Modes::Timer { time } => Timer::new(time)
+        Some(Modes::Timer { time }) => Timer::new(time)
             .count()
             .map(|counter| println!("{}", fmt_time(counter))),
-        Modes::Countdown { time } => Countdown::new(time).count().map(|counter| {
+        Some(Modes::Countdown { time }) => Countdown::new(time).count().map(|counter| {
             if counter == 0 {
                 after_end().expect("failed to notify or sound the end of countdown!");
             }
             println!("{}", fmt_time(counter))
         }),
-        Modes::Pomodoro {
-            work_time,
-            break_time,
-            long_break_time,
-        } => Pomodoro::new(work_time, break_time, long_break_time)
+        Some(Modes::Pomodoro { mode }) => match mode {
+            Some(PomoMode::Short) | None => Pomodoro::new(25 * 60, 5 * 60, 10 * 60)
+                .count()
+                .map(|counter| println!("{}", fmt_time(counter))),
+            Some(PomoMode::Long) => Pomodoro::new(55 * 60, 10 * 60, 20 * 60)
+                .count()
+                .map(|counter| println!("{}", fmt_time(counter))),
+            Some(PomoMode::Custom {
+                work_time,
+                break_time,
+                long_break_time,
+            }) => Pomodoro::new(work_time, break_time, long_break_time)
+                .count()
+                .map(|counter| println!("{}", fmt_time(counter))),
+        },
+        None => Pomodoro::new(25 * 60, 5 * 60, 10 * 60)
             .count()
             .map(|counter| println!("{}", fmt_time(counter))),
     }

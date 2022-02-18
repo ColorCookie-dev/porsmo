@@ -11,10 +11,10 @@
 ** In immediate future
 *** DONE Add direct time input
 *** DONE Add short and long command for subcommand
-*** Add pomodoro feature
-**** TODO Break timer
-**** TODO Work timer
-**** TODO Sessions (rounds of 4 block)
+*** DONE Add pomodoro feature
+**** DONE Break timer
+**** DONE Work timer
+**** DONE Sessions (rounds of 4 block)
 ** Someday
 *** TODO make the countdown not run longer when it ends
 *** TODO Tracking

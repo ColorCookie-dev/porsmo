@@ -103,7 +103,6 @@ impl Pomodoro {
             Mode::Work => {
                 show_message(&mut self.stdout_raw.stdout, "skip this work session?", 0)?;
             }
-
             Mode::Break => {
                 show_message(&mut self.stdout_raw.stdout, "skip this break?", 0)?;
             }
@@ -147,7 +146,7 @@ impl Pomodoro {
         }
         self.show_session()?;
 
-        show_message(&mut self.stdout_raw.stdout, "[Q]: Quit, [Enter]: next", 2)?;
+        show_message(&mut self.stdout_raw.stdout, "[Q]: Quit, [Enter]: Start", 2)?;
 
         Ok(())
     }
