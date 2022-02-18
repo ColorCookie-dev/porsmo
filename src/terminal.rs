@@ -146,11 +146,25 @@ mod tests {
     fn test_show_message() {
         let mut buf = Vec::<u8>::new();
         let msg = "Hello World";
-        let res = show_message(&mut buf, msg, 0);
 
-        let buf = String::from_utf8(buf.to_vec()).unwrap();
+        let res = show_message(&mut buf, msg, 0);
         assert!(res.is_ok());
-        assert!(buf.contains(msg));
+        assert!(String::from_utf8(buf.to_vec()).unwrap().contains(msg));
+
+        buf.clear();
+        let res = show_message_red(&mut buf, msg, 0);
+        assert!(res.is_ok());
+        assert!(String::from_utf8(buf.to_vec()).unwrap().contains(msg));
+
+        buf.clear();
+        let res = show_message_green(&mut buf, msg, 0);
+        assert!(res.is_ok());
+        assert!(String::from_utf8(buf.to_vec()).unwrap().contains(msg));
+
+        buf.clear();
+        let res = show_message_yellow(&mut buf, msg, 0);
+        assert!(res.is_ok());
+        assert!(String::from_utf8(buf.to_vec()).unwrap().contains(msg));
     }
 
     #[test]
