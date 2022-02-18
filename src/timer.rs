@@ -1,5 +1,7 @@
 use crate::counter::Counter;
 use crate::input::{listen_for_inputs, Command};
+use crate::notification::notify_default;
+use crate::sound::play_bell;
 use crate::terminal::{show_view, TermRawMode};
 use anyhow::Result;
 use std::{sync::mpsc::Receiver, time::Instant};
@@ -31,6 +33,12 @@ impl Timer {
             stdout_raw,
         }
     }
+
+    fn alert(&self) -> Result<()> {
+        notify_default("You break ended!", "Time for some work")?;
+        play_bell()?;
+        Ok(())
+    }
 }
 
 impl Counter for Timer {
@@ -48,7 +56,12 @@ impl Counter for Timer {
 
     fn counter(&self) -> u64 {
         if self.is_running() {
-            self.counter + self.started.elapsed().as_secs()
+            let elapsed = self.started.elapsed().as_secs();
+            if self.counter > elapsed {
+                self.counter - elapsed
+            } else {
+                0
+            }
         } else {
             self.counter
         }
@@ -56,7 +69,7 @@ impl Counter for Timer {
 
     fn pause(&mut self) {
         if self.is_running() {
-            self.counter += self.started.elapsed().as_secs();
+            self.counter = self.counter();
             self.status = Status::Paused;
         }
     }
@@ -68,10 +81,15 @@ impl Counter for Timer {
         }
     }
 
+    fn end_count(&mut self) {
+        self.pause();
+        self.status = Status::Ended;
+    }
+
     fn update(&mut self) -> Result<()> {
         match self.input_receiver.try_recv() {
             Ok(Command::Quit) => {
-                self.status = Status::Ended;
+                self.end_count();
                 return Ok(());
             }
 
@@ -88,6 +106,12 @@ impl Counter for Timer {
             }
 
             _ => (),
+        }
+
+        if self.counter() == 0 {
+            self.end_count();
+            self.alert()?;
+            return Ok(());
         }
 
         let running = self.is_running();

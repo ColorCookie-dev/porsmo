@@ -4,7 +4,7 @@
 - Personal project
 - All in one with good accuracy
   - Timer
-  - Countdown
+  - Stopwatch
   - Pomodoro
 
 * Roadmap
@@ -15,6 +15,7 @@
   - [X] Break timer
   - [X] Work timer
   - [X] Sessions (rounds of 4 block)
+  - [X] Stopwatch after the end of a mode to show exceeding time
 ** Someday
 - [ ] make the countdown not run longer when it ends
 - [ ] Tracking

@@ -1,18 +1,16 @@
-mod countdown;
 mod counter;
 mod format;
 mod input;
 mod notification;
 mod pomodoro;
 mod sound;
+mod stopwatch;
 mod terminal;
 mod timer;
 
 use crate::format::fmt_time;
-use crate::notification::notify_default;
 use crate::pomodoro::Pomodoro;
-use crate::sound::play_bell;
-use crate::{countdown::Countdown, counter::Counter, timer::Timer};
+use crate::{counter::Counter, stopwatch::Stopwatch, timer::Timer};
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 
@@ -21,7 +19,7 @@ use clap::{Parser, Subcommand};
     name = "Porsmo",
     author = "HellsNoah <hellsnoah@protonmail.com",
     version = "0.1.0",
-    about = "Timer and Countdown and Pomodoro",
+    about = "Timer and Stopwatch and Pomodoro",
     long_about = None,
 )]
 struct Cli {
@@ -31,18 +29,18 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Modes {
-    /// timer, counts up until you tell it to stop
-    #[clap(name = "timer", alias = "t")]
-    Timer {
+    /// stopwatch, counts up until you tell it to stop
+    #[clap(name = "stopwatch", alias = "s")]
+    Stopwatch {
         #[clap(parse(try_from_str=parse_time),
                default_value_t = 0,
                value_name = "time")]
         /// Lets you start timer from a particular time
         time: u64,
     },
-    /// countdown, counts down until you tell it to stop, or it ends
-    #[clap(name = "countdown", alias = "c")]
-    Countdown {
+    /// timer, counts down until you tell it to stop, or it ends
+    #[clap(name = "timer", alias = "t")]
+    Timer {
         #[clap(parse(try_from_str=parse_time),
                default_value_t = 25*60,
                value_name = "time")]
@@ -82,44 +80,27 @@ enum PomoMode {
 fn main() -> Result<()> {
     let args = Cli::parse();
     match args.mode {
-        Some(Modes::Timer { time }) => Timer::new(time)
-            .count()
-            .map(|counter| println!("{}", fmt_time(counter))),
+        Some(Modes::Stopwatch { time }) => Stopwatch::new(time).count(),
 
-        Some(Modes::Countdown { time }) => Countdown::new(time).count().map(|counter| {
-            if counter == 0 {
-                after_end().expect("failed to notify or sound the end of countdown!");
-            }
-            println!("{}", fmt_time(counter))
-        }),
+        Some(Modes::Timer { time }) => Timer::new(time).count(),
 
         Some(Modes::Pomodoro { mode }) => match mode {
-            Some(PomoMode::Short) | None => Pomodoro::new(25 * 60, 5 * 60, 10 * 60)
-                .count()
-                .map(|counter| println!("{}", fmt_time(counter))),
+            Some(PomoMode::Short) | None => Pomodoro::new(25 * 60, 5 * 60, 10 * 60).count(),
 
-            Some(PomoMode::Long) => Pomodoro::new(55 * 60, 10 * 60, 20 * 60)
-                .count()
-                .map(|counter| println!("{}", fmt_time(counter))),
+            Some(PomoMode::Long) => Pomodoro::new(55 * 60, 10 * 60, 20 * 60).count(),
 
             Some(PomoMode::Custom {
                 work_time,
                 break_time,
                 long_break_time,
-            }) => Pomodoro::new(work_time, break_time, long_break_time)
-                .count()
-                .map(|counter| println!("{}", fmt_time(counter))),
+            }) => Pomodoro::new(work_time, break_time, long_break_time).count(),
         },
 
-        None => Pomodoro::new(25 * 60, 5 * 60, 10 * 60)
-            .count()
-            .map(|counter| println!("{}", fmt_time(counter))),
+        None => Pomodoro::new(25 * 60, 5 * 60, 10 * 60).count(),
     }
-}
-
-fn after_end() -> Result<()> {
-    notify_default("Countdown ended!", "Your Porsmo Countdown Ended")?;
-    play_bell()
+    .map(|counter| {
+        println!("{}", fmt_time(counter));
+    })
 }
 
 fn parse_time(time_str: &str) -> Result<u64> {

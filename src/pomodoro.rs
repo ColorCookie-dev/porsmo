@@ -223,10 +223,15 @@ impl Counter for Pomodoro {
         }
     }
 
+    fn end_count(&mut self) {
+        self.pause();
+        self.status = Status::Ended;
+    }
+
     fn update(&mut self) -> Result<()> {
         match self.input_receiver.try_recv() {
             Ok(Command::Quit) => {
-                self.status = Status::Ended;
+                self.end_count();
                 return Ok(());
             }
 
@@ -270,6 +275,7 @@ impl Counter for Pomodoro {
         }
 
         if self.counter() == 0 {
+            self.pause();
             self.status = Status::ModeEnded;
             self.alert();
         }

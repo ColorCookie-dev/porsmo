@@ -4,7 +4,7 @@ use crate::terminal::{show_view, TermRawMode};
 use anyhow::Result;
 use std::{sync::mpsc::Receiver, time::Instant};
 
-pub struct Countdown {
+pub struct Stopwatch {
     started: Instant,
     counter: u64,
     status: Status,
@@ -18,7 +18,7 @@ enum Status {
     Ended,
 }
 
-impl Countdown {
+impl Stopwatch {
     pub fn new(count: u64) -> Self {
         let stdout_raw = TermRawMode::new();
         let input_receiver = listen_for_inputs();
@@ -33,7 +33,7 @@ impl Countdown {
     }
 }
 
-impl Counter for Countdown {
+impl Counter for Stopwatch {
     fn has_ended(&self) -> bool {
         matches!(self.status, Status::Ended)
     }
@@ -48,12 +48,7 @@ impl Counter for Countdown {
 
     fn counter(&self) -> u64 {
         if self.is_running() {
-            let elapsed = self.started.elapsed().as_secs();
-            if self.counter > elapsed {
-                self.counter - elapsed
-            } else {
-                0
-            }
+            self.counter + self.started.elapsed().as_secs()
         } else {
             self.counter
         }
@@ -61,7 +56,7 @@ impl Counter for Countdown {
 
     fn pause(&mut self) {
         if self.is_running() {
-            self.counter = self.counter();
+            self.counter += self.started.elapsed().as_secs();
             self.status = Status::Paused;
         }
     }
@@ -73,10 +68,15 @@ impl Counter for Countdown {
         }
     }
 
+    fn end_count(&mut self) {
+        self.pause();
+        self.status = Status::Ended;
+    }
+
     fn update(&mut self) -> Result<()> {
         match self.input_receiver.try_recv() {
             Ok(Command::Quit) => {
-                self.status = Status::Ended;
+                self.end_count();
                 return Ok(());
             }
 
@@ -93,10 +93,6 @@ impl Counter for Countdown {
             }
 
             _ => (),
-        }
-
-        if self.counter() == 0 {
-            self.status = Status::Ended;
         }
 
         let running = self.is_running();

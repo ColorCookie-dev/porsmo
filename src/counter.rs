@@ -14,6 +14,8 @@ pub trait Counter {
 
     fn resume(&mut self);
 
+    fn end_count(&mut self);
+
     fn toggle(&mut self) {
         if self.is_running() {
             self.pause();
