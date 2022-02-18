@@ -16,28 +16,28 @@ pub enum Command {
 }
 
 pub fn listen_for_inputs() -> Receiver<Command> {
-    let (tx, rx) = mpsc::channel::<Command>();
+    let (tx, rx) = mpsc::sync_channel::<Command>(3);
 
     thread::spawn(move || {
         let stdin = stdin().keys();
         for c in stdin {
             match c.unwrap() {
-                Key::Char('q') => tx.send(Command::Quit).unwrap(),
-                Key::Ctrl('c') => tx.send(Command::Quit).unwrap(),
-                Key::Ctrl('z') => tx.send(Command::Quit).unwrap(),
+                Key::Char('q') => tx.try_send(Command::Quit).ok(),
+                Key::Ctrl('c') => tx.try_send(Command::Quit).ok(),
+                Key::Ctrl('z') => tx.try_send(Command::Quit).ok(),
 
-                Key::Char('S') => tx.send(Command::Skip).unwrap(),
-                Key::Char('n') => tx.send(Command::No).unwrap(),
+                Key::Char('S') => tx.try_send(Command::Skip).ok(),
+                Key::Char('n') => tx.try_send(Command::No).ok(),
 
-                Key::Char('\n') => tx.send(Command::Enter).unwrap(),
-                Key::Char('t') => tx.send(Command::Toggle).unwrap(),
-                Key::Char(' ') => tx.send(Command::Toggle).unwrap(),
+                Key::Char('\n') => tx.try_send(Command::Enter).ok(),
+                Key::Char('t') => tx.try_send(Command::Toggle).ok(),
+                Key::Char(' ') => tx.try_send(Command::Toggle).ok(),
 
-                Key::Char('p') => tx.send(Command::Pause).unwrap(),
-                Key::Char('c') => tx.send(Command::Resume).unwrap(),
+                Key::Char('p') => tx.try_send(Command::Pause).ok(),
+                Key::Char('c') => tx.try_send(Command::Resume).ok(),
 
-                _ => (),
-            }
+                _ => None,
+            };
         }
     });
 
