@@ -142,3 +142,36 @@ fn parse_time(time_str: &str) -> Result<u64> {
 
     Ok(secs)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_parse_time() -> Result<()> {
+        let ok_cases = vec![
+            ("1020", 1020),
+            ("2:000092", 2 * 60 + 92),
+            ("2:", 2 * 60),
+            ("::10", 10),
+            ("", 0),
+            (":", 0),
+            ("::", 0),
+            (":::", 0),
+            ("1:::", 1 * 24 * 60 * 60),
+            ("::::", 0),
+            (":::::", 0),
+        ];
+
+        for (inp, out) in ok_cases.iter() {
+            assert_eq!(parse_time(inp)?, *out);
+        }
+
+        let err_cases = vec!["1::::", "kjdf:kjfk", ":kjfk", "1:4k:5"];
+
+        for inp in err_cases.iter() {
+            assert!(parse_time(inp).is_err());
+        }
+
+        Ok(())
+    }
+}

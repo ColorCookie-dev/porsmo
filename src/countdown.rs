@@ -111,17 +111,3 @@ impl Counter for Countdown {
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::time::Instant;
-
-    #[test]
-    fn test_countdown() {
-        let instant = Instant::now();
-        Countdown::new(1).count().unwrap();
-        let elapsed = instant.elapsed().as_secs();
-        assert_eq!(elapsed, 1);
-    }
-}
