@@ -60,7 +60,7 @@ impl Pomodoro {
         }
     }
 
-    fn session(&self) -> u64 {
+    pub fn session(&self) -> u64 {
         self.session + 1
     }
 
@@ -131,15 +131,9 @@ impl Pomodoro {
     fn show_mode_change(&mut self) -> Result<()> {
         clear(self.get_mut_stdout())?;
         match self.check_next_mode() {
-            Mode::Work => {
-                show_message_red(self.get_mut_stdout(), "start work?", 0)?;
-            }
-            Mode::Break => {
-                show_message_green(self.get_mut_stdout(), "start break?", 0)?;
-            }
-            Mode::LongBreak => {
-                show_message_green(self.get_mut_stdout(), "start long break?", 0)?;
-            }
+            Mode::Work => show_message_red(self.get_mut_stdout(), "start work?", 0)?,
+            Mode::Break => show_message_green(self.get_mut_stdout(), "start break?", 0)?,
+            Mode::LongBreak => show_message_green(self.get_mut_stdout(), "start long break?", 0)?,
         }
         self.show_session()?;
 
@@ -157,6 +151,7 @@ impl Pomodoro {
                 self.show_session()?;
                 show_message(self.get_mut_stdout(), "[Q]: quit, [Space]: pause/resume", 2)?;
             }
+
             Status::Paused => {
                 show_time_paused(self.get_mut_stdout(), counter)?;
                 self.show_session()?;
