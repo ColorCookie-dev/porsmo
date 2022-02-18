@@ -6,6 +6,10 @@ pub trait Counter {
 
     fn is_paused(&self) -> bool;
 
+    fn has_ended(&self) -> bool;
+
+    fn counter(&self) -> u64;
+
     fn pause(&mut self);
 
     fn resume(&mut self);
@@ -17,10 +21,6 @@ pub trait Counter {
             self.resume();
         }
     }
-
-    fn counter(&self) -> u64;
-
-    fn has_ended(&self) -> bool;
 
     fn update(&mut self) -> Result<()>;
 

@@ -46,6 +46,14 @@ impl Counter for Timer {
         matches!(self.status, Status::Paused)
     }
 
+    fn counter(&self) -> u64 {
+        if self.is_running() {
+            self.counter + self.started.elapsed().as_secs()
+        } else {
+            self.counter
+        }
+    }
+
     fn pause(&mut self) {
         if self.is_running() {
             self.counter += self.started.elapsed().as_secs();
@@ -57,14 +65,6 @@ impl Counter for Timer {
         if self.is_paused() {
             self.status = Status::Running;
             self.started = Instant::now();
-        }
-    }
-
-    fn counter(&self) -> u64 {
-        if self.is_running() {
-            self.counter + self.started.elapsed().as_secs()
-        } else {
-            self.counter
         }
     }
 

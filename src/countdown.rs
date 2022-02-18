@@ -46,25 +46,6 @@ impl Counter for Countdown {
         matches!(self.status, Status::Paused)
     }
 
-    fn pause(&mut self) {
-        if self.is_running() {
-            let elapsed = self.started.elapsed().as_secs();
-            self.counter = if self.counter > elapsed {
-                self.counter - elapsed
-            } else {
-                0
-            };
-            self.status = Status::Paused;
-        }
-    }
-
-    fn resume(&mut self) {
-        if self.is_paused() {
-            self.status = Status::Running;
-            self.started = Instant::now();
-        }
-    }
-
     fn counter(&self) -> u64 {
         if self.is_running() {
             let elapsed = self.started.elapsed().as_secs();
@@ -75,6 +56,20 @@ impl Counter for Countdown {
             }
         } else {
             self.counter
+        }
+    }
+
+    fn pause(&mut self) {
+        if self.is_running() {
+            self.counter = self.counter();
+            self.status = Status::Paused;
+        }
+    }
+
+    fn resume(&mut self) {
+        if self.is_paused() {
+            self.status = Status::Running;
+            self.started = Instant::now();
         }
     }
 
@@ -100,7 +95,7 @@ impl Counter for Countdown {
             _ => (),
         }
 
-        if self.is_running() && self.counter <= self.started.elapsed().as_secs() {
+        if self.counter() == 0 {
             self.status = Status::Ended;
         }
 

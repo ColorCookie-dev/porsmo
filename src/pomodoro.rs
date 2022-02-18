@@ -7,7 +7,8 @@ use crate::terminal::{
     show_time_paused, show_time_running, TermRawMode,
 };
 use anyhow::Result;
-use std::{sync::mpsc::Receiver, thread, time::Instant};
+use std::{io::Stdout, sync::mpsc::Receiver, thread, time::Instant};
+use termion::raw::RawTerminal;
 
 pub struct Pomodoro {
     started: Instant,
@@ -97,56 +98,52 @@ impl Pomodoro {
         }
     }
 
+    fn get_mut_stdout(&mut self) -> &mut RawTerminal<Stdout> {
+        &mut self.stdout_raw.stdout
+    }
+
     fn show_prompt(&mut self) -> Result<()> {
-        clear(&mut self.stdout_raw.stdout)?;
+        clear(self.get_mut_stdout())?;
         match self.mode {
             Mode::Work => {
-                show_message(&mut self.stdout_raw.stdout, "skip this work session?", 0)?;
+                show_message(self.get_mut_stdout(), "skip this work session?", 0)?;
             }
             Mode::Break => {
-                show_message(&mut self.stdout_raw.stdout, "skip this break?", 0)?;
+                show_message(self.get_mut_stdout(), "skip this break?", 0)?;
             }
             Mode::LongBreak => {
-                show_message(&mut self.stdout_raw.stdout, "skip this long break?", 0)?;
+                show_message(self.get_mut_stdout(), "skip this long break?", 0)?;
             }
         }
 
         self.show_session()?;
 
-        show_message(
-            &mut self.stdout_raw.stdout,
-            "[Q]: Quit, [Enter]: Yes, [N]: No",
-            2,
-        )?;
+        show_message(self.get_mut_stdout(), "[Q]: Quit, [Enter]: Yes, [N]: No", 2)?;
 
         Ok(())
     }
 
     fn show_session(&mut self) -> Result<()> {
         let session = self.session();
-        show_message_yellow(
-            &mut self.stdout_raw.stdout,
-            &format!("(Round: {})", session),
-            1,
-        )
+        show_message_yellow(self.get_mut_stdout(), &format!("(Round: {})", session), 1)
     }
 
     fn show_mode_change(&mut self) -> Result<()> {
-        clear(&mut self.stdout_raw.stdout)?;
+        clear(self.get_mut_stdout())?;
         match self.check_next_mode() {
             Mode::Work => {
-                show_message_red(&mut self.stdout_raw.stdout, "start work?", 0)?;
+                show_message_red(self.get_mut_stdout(), "start work?", 0)?;
             }
             Mode::Break => {
-                show_message_green(&mut self.stdout_raw.stdout, "start break?", 0)?;
+                show_message_green(self.get_mut_stdout(), "start break?", 0)?;
             }
             Mode::LongBreak => {
-                show_message_green(&mut self.stdout_raw.stdout, "start long break?", 0)?;
+                show_message_green(self.get_mut_stdout(), "start long break?", 0)?;
             }
         }
         self.show_session()?;
 
-        show_message(&mut self.stdout_raw.stdout, "[Q]: Quit, [Enter]: Start", 2)?;
+        show_message(self.get_mut_stdout(), "[Q]: Quit, [Enter]: Start", 2)?;
 
         Ok(())
     }
@@ -156,22 +153,14 @@ impl Pomodoro {
 
         match self.status {
             Status::Running => {
-                show_time_running(&mut self.stdout_raw.stdout, counter)?;
+                show_time_running(self.get_mut_stdout(), counter)?;
                 self.show_session()?;
-                show_message(
-                    &mut self.stdout_raw.stdout,
-                    "[Q]: quit, [Space]: pause/resume",
-                    2,
-                )?;
+                show_message(self.get_mut_stdout(), "[Q]: quit, [Space]: pause/resume", 2)?;
             }
             Status::Paused => {
-                show_time_paused(&mut self.stdout_raw.stdout, counter)?;
+                show_time_paused(self.get_mut_stdout(), counter)?;
                 self.show_session()?;
-                show_message(
-                    &mut self.stdout_raw.stdout,
-                    "[Q]: quit, [Space]: pause/resume",
-                    2,
-                )?;
+                show_message(self.get_mut_stdout(), "[Q]: quit, [Space]: pause/resume", 2)?;
             }
             _ => (),
         }
@@ -218,25 +207,6 @@ impl Counter for Pomodoro {
         matches!(self.status, Status::Paused)
     }
 
-    fn pause(&mut self) {
-        if self.is_running() {
-            let elapsed = self.started.elapsed().as_secs();
-            self.counter = if self.counter > elapsed {
-                self.counter - elapsed
-            } else {
-                0
-            };
-            self.status = Status::Paused;
-        }
-    }
-
-    fn resume(&mut self) {
-        if self.is_paused() {
-            self.status = Status::Running;
-            self.started = Instant::now();
-        }
-    }
-
     fn counter(&self) -> u64 {
         if self.is_running() {
             let elapsed = self.started.elapsed().as_secs();
@@ -247,6 +217,20 @@ impl Counter for Pomodoro {
             }
         } else {
             self.counter
+        }
+    }
+
+    fn pause(&mut self) {
+        if self.is_running() {
+            self.counter = self.counter();
+            self.status = Status::Paused;
+        }
+    }
+
+    fn resume(&mut self) {
+        if self.is_paused() {
+            self.status = Status::Running;
+            self.started = Instant::now();
         }
     }
 
@@ -296,7 +280,7 @@ impl Counter for Pomodoro {
             _ => (),
         }
 
-        if self.is_running() && self.counter <= self.started.elapsed().as_secs() {
+        if self.counter() == 0 {
             self.status = Status::ModeEnded;
             self.alert();
         }
