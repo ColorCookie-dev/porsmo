@@ -3,12 +3,14 @@ mod counter;
 mod format;
 mod input;
 mod notification;
+mod pomodoro;
 mod sound;
 mod terminal;
 mod timer;
 
 use crate::format::fmt_time;
 use crate::notification::notify_default;
+use crate::pomodoro::Pomodoro;
 use crate::sound::play_bell;
 use crate::{countdown::Countdown, counter::Counter, timer::Timer};
 use anyhow::{bail, Result};
@@ -46,6 +48,22 @@ enum Modes {
                value_name = "time")]
         time: u64,
     },
+    /// pomodoro, for all you productivity needs
+    #[clap(name = "pomodoro", alias = "p")]
+    Pomodoro {
+        #[clap(parse(try_from_str=parse_time),
+               default_value_t = 25*60,
+               value_name = "work time")]
+        work_time: u64,
+        #[clap(parse(try_from_str=parse_time),
+               default_value_t = 5*60,
+               value_name = "break time")]
+        break_time: u64,
+        #[clap(parse(try_from_str=parse_time),
+               default_value_t = 20*60,
+               value_name = "long break time")]
+        long_break_time: u64,
+    },
 }
 
 fn main() -> Result<()> {
@@ -60,6 +78,13 @@ fn main() -> Result<()> {
             }
             println!("{}", fmt_time(counter))
         }),
+        Modes::Pomodoro {
+            work_time,
+            break_time,
+            long_break_time,
+        } => Pomodoro::new(work_time, break_time, long_break_time)
+            .count()
+            .map(|counter| println!("{}", fmt_time(counter))),
     }
 }
 

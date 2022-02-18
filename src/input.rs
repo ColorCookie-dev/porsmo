@@ -10,6 +10,9 @@ pub enum Command {
     Pause,
     Resume,
     Toggle,
+    Enter,
+    Skip,
+    No,
 }
 
 pub fn listen_for_inputs() -> Receiver<Command> {
@@ -23,7 +26,10 @@ pub fn listen_for_inputs() -> Receiver<Command> {
                 Key::Ctrl('c') => tx.send(Command::Quit).unwrap(),
                 Key::Ctrl('z') => tx.send(Command::Quit).unwrap(),
 
-                Key::Char('\n') => tx.send(Command::Toggle).unwrap(),
+                Key::Char('S') => tx.send(Command::Skip).unwrap(),
+                Key::Char('n') => tx.send(Command::No).unwrap(),
+
+                Key::Char('\n') => tx.send(Command::Enter).unwrap(),
                 Key::Char('t') => tx.send(Command::Toggle).unwrap(),
                 Key::Char(' ') => tx.send(Command::Toggle).unwrap(),
 

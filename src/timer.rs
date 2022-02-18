@@ -83,7 +83,7 @@ impl Counter for Timer {
                 self.resume();
             }
 
-            Ok(Command::Toggle) => {
+            Ok(Command::Toggle) | Ok(Command::Enter) => {
                 self.toggle();
             }
 

@@ -93,7 +93,7 @@ impl Counter for Countdown {
                 self.resume();
             }
 
-            Ok(Command::Toggle) => {
+            Ok(Command::Toggle) | Ok(Command::Enter) => {
                 self.toggle();
             }
 

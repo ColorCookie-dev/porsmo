@@ -37,9 +37,21 @@ pub fn reset_terminal(stdout: &mut impl Write) -> Result<()> {
     stdout.flush().with_context(|| "failed to flush stdout")
 }
 
+pub fn clear(stdout: &mut impl Write) -> Result<()> {
+    write!(
+        stdout,
+        "{top}{clear}",
+        top = cursor::Goto(1, 1),
+        clear = clear::All,
+    )
+    .with_context(|| "failed to clear the terminal")?;
+
+    stdout.flush().with_context(|| "failed to flush stdout")
+}
+
 pub fn show_view(stdout: &mut impl Write, time: u64, running: bool) -> Result<()> {
     show_time(stdout, time, running)?;
-    show_message(stdout, "[Q]: quit, [Space]: pause/resume", 0)
+    show_message(stdout, "[Q]: quit, [Space]: pause/resume", 1)
 }
 
 pub fn show_time(stdout: &mut impl Write, time: u64, running: bool) -> Result<()> {
@@ -82,8 +94,44 @@ pub fn show_message(stdout: &mut impl Write, msg: &str, down: u16) -> Result<()>
     write!(
         stdout,
         "{cursor}{color}{time}",
-        cursor = cursor::Goto(1, 2 + down),
+        cursor = cursor::Goto(1, 1 + down),
         color = color::Fg(color::Magenta),
+        time = msg
+    )
+    .with_context(|| "failed to display message")?;
+    stdout.flush().with_context(|| "failed to flush stdout")
+}
+
+pub fn show_message_red(stdout: &mut impl Write, msg: &str, down: u16) -> Result<()> {
+    write!(
+        stdout,
+        "{cursor}{color}{time}",
+        cursor = cursor::Goto(1, 1 + down),
+        color = color::Fg(color::Red),
+        time = msg
+    )
+    .with_context(|| "failed to display message")?;
+    stdout.flush().with_context(|| "failed to flush stdout")
+}
+
+pub fn show_message_yellow(stdout: &mut impl Write, msg: &str, down: u16) -> Result<()> {
+    write!(
+        stdout,
+        "{cursor}{color}{time}",
+        cursor = cursor::Goto(1, 1 + down),
+        color = color::Fg(color::LightYellow),
+        time = msg
+    )
+    .with_context(|| "failed to display message")?;
+    stdout.flush().with_context(|| "failed to flush stdout")
+}
+
+pub fn show_message_green(stdout: &mut impl Write, msg: &str, down: u16) -> Result<()> {
+    write!(
+        stdout,
+        "{cursor}{color}{time}",
+        cursor = cursor::Goto(1, 1 + down),
+        color = color::Fg(color::Green),
         time = msg
     )
     .with_context(|| "failed to display message")?;
