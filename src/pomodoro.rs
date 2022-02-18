@@ -105,16 +105,10 @@ impl Pomodoro {
     fn show_prompt(&mut self) -> Result<()> {
         clear(self.get_mut_stdout())?;
         match self.mode {
-            Mode::Work => {
-                show_message(self.get_mut_stdout(), "skip this work session?", 0)?;
-            }
-            Mode::Break => {
-                show_message(self.get_mut_stdout(), "skip this break?", 0)?;
-            }
-            Mode::LongBreak => {
-                show_message(self.get_mut_stdout(), "skip this long break?", 0)?;
-            }
-        }
+            Mode::Work => show_message(self.get_mut_stdout(), "skip this work session?", 0)?,
+            Mode::Break => show_message(self.get_mut_stdout(), "skip this break?", 0)?,
+            Mode::LongBreak => show_message(self.get_mut_stdout(), "skip this long break?", 0)?,
+        };
 
         self.show_session()?;
 
