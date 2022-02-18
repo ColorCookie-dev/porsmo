@@ -1,4 +1,5 @@
 use crate::counter::Counter;
+use crate::format::fmt_time;
 use crate::input::{listen_for_inputs, Command};
 use crate::notification::notify_default;
 use crate::sound::play_bell;
@@ -35,6 +36,7 @@ enum Status {
     Running,
     Paused,
     ModeEnded,
+    ModeEndedPaused,
     Prompt,
     Ended,
 }
@@ -98,88 +100,27 @@ impl Pomodoro {
         }
     }
 
-    fn get_mut_stdout(&mut self) -> &mut RawTerminal<Stdout> {
-        &mut self.stdout_raw.stdout
+    fn end_mode(&mut self) {
+        self.counter = self.counter_now();
+        self.status = Status::ModeEnded;
+        self.alert();
     }
 
-    fn show_prompt(&mut self) -> Result<()> {
-        clear(self.get_mut_stdout())?;
-        match self.mode {
-            Mode::Work => show_message(self.get_mut_stdout(), "skip this work session?", 0)?,
-            Mode::Break => show_message(self.get_mut_stdout(), "skip this break?", 0)?,
-            Mode::LongBreak => show_message(self.get_mut_stdout(), "skip this long break?", 0)?,
-        };
-
-        self.show_session()?;
-
-        show_message(self.get_mut_stdout(), "[Q]: Quit, [Enter]: Yes, [N]: No", 2)?;
-
-        Ok(())
-    }
-
-    fn show_session(&mut self) -> Result<()> {
-        let session = self.session();
-        show_message_yellow(self.get_mut_stdout(), &format!("(Round: {})", session), 1)
-    }
-
-    fn show_mode_change(&mut self) -> Result<()> {
-        clear(self.get_mut_stdout())?;
-        match self.check_next_mode() {
-            Mode::Work => show_message_red(self.get_mut_stdout(), "start work?", 0)?,
-            Mode::Break => show_message_green(self.get_mut_stdout(), "start break?", 0)?,
-            Mode::LongBreak => show_message_green(self.get_mut_stdout(), "start long break?", 0)?,
+    fn counter_now(&self) -> u64 {
+        let elapsed = self.started.elapsed().as_secs();
+        if self.counter > elapsed {
+            self.counter - elapsed
+        } else {
+            0
         }
-        self.show_session()?;
-
-        show_message(self.get_mut_stdout(), "[Q]: Quit, [Enter]: Start", 2)?;
-
-        Ok(())
     }
 
-    fn show_counter(&mut self) -> Result<()> {
-        let counter = self.counter();
-
+    fn extended_counter(&self) -> u64 {
         match self.status {
-            Status::Running => {
-                show_time_running(self.get_mut_stdout(), counter)?;
-                self.show_session()?;
-                show_message(self.get_mut_stdout(), "[Q]: quit, [Space]: pause/resume", 2)?;
-            }
-
-            Status::Paused => {
-                show_time_paused(self.get_mut_stdout(), counter)?;
-                self.show_session()?;
-                show_message(self.get_mut_stdout(), "[Q]: quit, [Space]: pause/resume", 2)?;
-            }
-            _ => (),
+            Status::ModeEnded => self.counter + self.started.elapsed().as_secs(),
+            Status::ModeEndedPaused => self.counter,
+            _ => 0,
         }
-
-        Ok(())
-    }
-
-    fn alert(&self) {
-        let heading;
-        let message;
-
-        match self.check_next_mode() {
-            Mode::Work => {
-                heading = "You break ended!";
-                message = "Time for some work"
-            }
-            Mode::Break => {
-                heading = "Pomodoro ended!";
-                message = "Time for a short break"
-            }
-            Mode::LongBreak => {
-                heading = "Pomodoro ended!";
-                message = "Time for a long break"
-            }
-        }
-
-        thread::spawn(move || {
-            notify_default(heading, message).unwrap();
-            play_bell().unwrap();
-        });
     }
 }
 
@@ -198,12 +139,7 @@ impl Counter for Pomodoro {
 
     fn counter(&self) -> u64 {
         if self.is_running() {
-            let elapsed = self.started.elapsed().as_secs();
-            if self.counter > elapsed {
-                self.counter - elapsed
-            } else {
-                0
-            }
+            self.counter_now()
         } else {
             self.counter
         }
@@ -211,7 +147,7 @@ impl Counter for Pomodoro {
 
     fn pause(&mut self) {
         if self.is_running() {
-            self.counter = self.counter();
+            self.counter = self.counter_now();
             self.status = Status::Paused;
         }
     }
@@ -220,6 +156,22 @@ impl Counter for Pomodoro {
         if self.is_paused() {
             self.status = Status::Running;
             self.started = Instant::now();
+        }
+    }
+
+    fn toggle(&mut self) {
+        match self.status {
+            Status::Running => self.pause(),
+            Status::Paused => self.resume(),
+            Status::ModeEnded => {
+                self.counter = self.extended_counter();
+                self.status = Status::ModeEndedPaused;
+            }
+            Status::ModeEndedPaused => {
+                self.started = Instant::now();
+                self.status = Status::ModeEnded;
+            }
+            _ => (),
         }
     }
 
@@ -274,14 +226,12 @@ impl Counter for Pomodoro {
             _ => (),
         }
 
-        if self.counter() == 0 {
-            self.pause();
-            self.status = Status::ModeEnded;
-            self.alert();
+        if self.is_running() && self.counter_now() == 0 {
+            self.end_mode();
         }
 
         match self.status {
-            Status::ModeEnded => {
+            Status::ModeEnded | Status::ModeEndedPaused => {
                 self.show_mode_change()?;
             }
 
@@ -295,6 +245,112 @@ impl Counter for Pomodoro {
 
             Status::Ended => (),
         }
+
+        Ok(())
+    }
+}
+
+impl Pomodoro {
+    fn show_counter(&mut self) -> Result<()> {
+        let counter = self.counter();
+
+        match self.status {
+            Status::Running => {
+                show_time_running(self.get_mut_stdout(), counter)?;
+                self.show_session()?;
+                show_message(self.get_mut_stdout(), "[Q]: quit, [Space]: pause/resume", 2)?;
+            }
+
+            Status::Paused => {
+                show_time_paused(self.get_mut_stdout(), counter)?;
+                self.show_session()?;
+                show_message(self.get_mut_stdout(), "[Q]: quit, [Space]: pause/resume", 2)?;
+            }
+            _ => (),
+        }
+
+        Ok(())
+    }
+
+    fn alert(&self) {
+        let heading;
+        let message;
+
+        match self.check_next_mode() {
+            Mode::Work => {
+                heading = "You break ended!";
+                message = "Time for some work"
+            }
+            Mode::Break => {
+                heading = "Pomodoro ended!";
+                message = "Time for a short break"
+            }
+            Mode::LongBreak => {
+                heading = "Pomodoro ended!";
+                message = "Time for a long break"
+            }
+        }
+
+        thread::spawn(move || {
+            notify_default(heading, message).unwrap();
+            play_bell().unwrap();
+        });
+    }
+
+    fn get_mut_stdout(&mut self) -> &mut RawTerminal<Stdout> {
+        &mut self.stdout_raw.stdout
+    }
+
+    fn show_prompt(&mut self) -> Result<()> {
+        clear(self.get_mut_stdout())?;
+        match self.mode {
+            Mode::Work => show_message(self.get_mut_stdout(), "skip this work session?", 0)?,
+            Mode::Break => show_message(self.get_mut_stdout(), "skip this break?", 0)?,
+            Mode::LongBreak => show_message(self.get_mut_stdout(), "skip this long break?", 0)?,
+        };
+
+        self.show_session()?;
+
+        show_message(self.get_mut_stdout(), "[Q]: Quit, [Enter]: Yes, [N]: No", 2)?;
+
+        Ok(())
+    }
+
+    fn show_session(&mut self) -> Result<()> {
+        let session = self.session();
+        show_message_yellow(self.get_mut_stdout(), &format!("(Round: {})", session), 1)
+    }
+
+    fn show_extended_time(&mut self) -> Result<()> {
+        let counter = self.extended_counter();
+        match self.status {
+            Status::ModeEnded => {
+                show_message_green(self.get_mut_stdout(), &format!("+{}", fmt_time(counter)), 3)?
+            }
+            Status::ModeEndedPaused => {
+                show_message_red(self.get_mut_stdout(), &format!("+{}", fmt_time(counter)), 3)?
+            }
+            _ => (),
+        };
+        Ok(())
+    }
+
+    fn show_mode_change(&mut self) -> Result<()> {
+        clear(self.get_mut_stdout())?;
+        match self.check_next_mode() {
+            Mode::Work => show_message_red(self.get_mut_stdout(), "start work?", 0)?,
+            Mode::Break => show_message_green(self.get_mut_stdout(), "start break?", 0)?,
+            Mode::LongBreak => show_message_green(self.get_mut_stdout(), "start long break?", 0)?,
+        }
+        self.show_session()?;
+
+        show_message(
+            self.get_mut_stdout(),
+            "[Q]: Quit, [Enter]: Start, [Space]: toggle excess counter",
+            2,
+        )?;
+
+        self.show_extended_time()?;
 
         Ok(())
     }
