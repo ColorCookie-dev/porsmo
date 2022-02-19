@@ -146,16 +146,30 @@ impl Counter for Pomodoro {
     }
 
     fn pause(&mut self) {
-        if self.is_running() {
-            self.counter = self.counter_now();
-            self.status = Status::Paused;
+        match self.status {
+            Status::Running => {
+                self.counter = self.counter_now();
+                self.status = Status::Paused;
+            }
+            Status::ModeEnded => {
+                self.counter = self.extended_counter();
+                self.status = Status::ModeEndedPaused;
+            }
+            _ => (),
         }
     }
 
     fn resume(&mut self) {
-        if self.is_paused() {
-            self.status = Status::Running;
-            self.started = Instant::now();
+        match self.status {
+            Status::Paused => {
+                self.status = Status::Running;
+                self.started = Instant::now();
+            }
+            Status::ModeEndedPaused => {
+                self.status = Status::ModeEnded;
+                self.started = Instant::now();
+            }
+            _ => (),
         }
     }
 
@@ -168,8 +182,8 @@ impl Counter for Pomodoro {
                 self.status = Status::ModeEndedPaused;
             }
             Status::ModeEndedPaused => {
-                self.started = Instant::now();
                 self.status = Status::ModeEnded;
+                self.started = Instant::now();
             }
             _ => (),
         }
@@ -200,7 +214,7 @@ impl Counter for Pomodoro {
             }
 
             Ok(Command::Enter) => match self.status {
-                Status::ModeEnded | Status::Prompt => {
+                Status::ModeEnded | Status::ModeEndedPaused | Status::Prompt => {
                     self.next_mode();
                     self.status = Status::Running;
                     return Ok(());
