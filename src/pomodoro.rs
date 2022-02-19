@@ -30,6 +30,10 @@ impl Pomodoro {
         }
     }
 
+    pub fn mode(&self) -> Mode {
+        self.mode
+    }
+
     pub fn check_next_mode(&self) -> Mode {
         match self.mode {
             Mode::Work => {

@@ -71,7 +71,7 @@ pub fn pomodoro(work_time: u64, break_time: u64, long_break_time: u64) -> Result
         }
 
         if skip_prompt {
-            show_prompt(stdout, pomo.check_next_mode())?;
+            show_prompt(stdout, pomo.mode())?;
         } else {
             if pomo.has_ended() {
                 alert(pomo.check_next_mode());
@@ -173,9 +173,9 @@ fn alert(next_mode: Mode) {
     });
 }
 
-fn show_prompt(stdout: &mut RawTerminal<Stdout>, next_mode: Mode) -> Result<()> {
+fn show_prompt(stdout: &mut RawTerminal<Stdout>, mode: Mode) -> Result<()> {
     clear(stdout)?;
-    match next_mode {
+    match mode {
         Mode::Work => show_message(stdout, "skip this work session?", 0)?,
         Mode::Break => show_message(stdout, "skip this break?", 0)?,
         Mode::LongBreak => show_message(stdout, "skip this long break?", 0)?,
