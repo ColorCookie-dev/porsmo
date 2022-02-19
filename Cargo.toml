@@ -1,10 +1,10 @@
 [package]
 name = "porsmo"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 readme = "README.org"
 license = "MIT"
-description = "A pomodoro and time and countdown, all in one app"
+description = "A pomodoro, timer and stopwatch, all in one app"
 homepage = "https://github.com/ColorCookie-dev/porsmo"
 repository = "https://github.com/ColorCookie-dev/porsmo"
 keywords = ["cli", "pomodoro", "timer", "countdown"]
