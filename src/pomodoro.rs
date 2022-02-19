@@ -114,14 +114,6 @@ impl Pomodoro {
             0
         }
     }
-
-    fn extended_counter(&self) -> u64 {
-        match self.status {
-            Status::ModeEnded => self.counter + self.started.elapsed().as_secs(),
-            Status::ModeEndedPaused => self.counter,
-            _ => 0,
-        }
-    }
 }
 
 impl Counter for Pomodoro {
@@ -138,10 +130,10 @@ impl Counter for Pomodoro {
     }
 
     fn counter(&self) -> u64 {
-        if self.is_running() {
-            self.counter_now()
-        } else {
-            self.counter
+        match self.status {
+            Status::Running => self.counter_now(),
+            Status::ModeEnded => self.counter + self.started.elapsed().as_secs(),
+            _ => self.counter,
         }
     }
 
@@ -152,7 +144,7 @@ impl Counter for Pomodoro {
                 self.status = Status::Paused;
             }
             Status::ModeEnded => {
-                self.counter = self.extended_counter();
+                self.counter = self.counter();
                 self.status = Status::ModeEndedPaused;
             }
             _ => (),
@@ -175,16 +167,8 @@ impl Counter for Pomodoro {
 
     fn toggle(&mut self) {
         match self.status {
-            Status::Running => self.pause(),
-            Status::Paused => self.resume(),
-            Status::ModeEnded => {
-                self.counter = self.extended_counter();
-                self.status = Status::ModeEndedPaused;
-            }
-            Status::ModeEndedPaused => {
-                self.status = Status::ModeEnded;
-                self.started = Instant::now();
-            }
+            Status::Running | Status::ModeEnded => self.pause(),
+            Status::Paused | Status::ModeEndedPaused => self.resume(),
             _ => (),
         }
     }
@@ -336,13 +320,13 @@ impl Pomodoro {
     }
 
     fn show_extended_time(&mut self) -> Result<()> {
-        let counter = self.extended_counter();
+        let counter = self.counter();
         match self.status {
             Status::ModeEnded => {
-                show_message_green(self.get_mut_stdout(), &format!("+{}", fmt_time(counter)), 3)?
+                show_message_green(self.get_mut_stdout(), &format!("-{}", fmt_time(counter)), 3)?
             }
             Status::ModeEndedPaused => {
-                show_message_red(self.get_mut_stdout(), &format!("+{}", fmt_time(counter)), 3)?
+                show_message_red(self.get_mut_stdout(), &format!("-{}", fmt_time(counter)), 3)?
             }
             _ => (),
         };
@@ -360,7 +344,7 @@ impl Pomodoro {
 
         show_message(
             self.get_mut_stdout(),
-            "[Q]: Quit, [Enter]: Start, [Space]: toggle excess counter",
+            "[Q]: Quit, [Enter]: Start, [Space]: Toggle excess counter",
             2,
         )?;
 
