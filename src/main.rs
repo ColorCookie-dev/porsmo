@@ -3,14 +3,16 @@ mod format;
 mod input;
 mod notification;
 mod pomodoro;
+mod pomodoro_term;
 mod sound;
 mod stopwatch;
+mod stopwatch_term;
 mod terminal;
 mod timer;
+mod timer_term;
 
 use crate::format::fmt_time;
-use crate::pomodoro::Pomodoro;
-use crate::{counter::Counter, stopwatch::Stopwatch, timer::Timer};
+use crate::{pomodoro_term::pomodoro, stopwatch_term::stopwatch, timer_term::timer};
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 
@@ -80,23 +82,23 @@ enum PomoMode {
 fn main() -> Result<()> {
     let args = Cli::parse();
     match args.mode {
-        Some(Modes::Stopwatch { time }) => Stopwatch::new(time).count(),
+        Some(Modes::Stopwatch { time }) => stopwatch(time),
 
-        Some(Modes::Timer { time }) => Timer::new(time).count(),
+        Some(Modes::Timer { time }) => timer(time),
 
         Some(Modes::Pomodoro { mode }) => match mode {
-            Some(PomoMode::Short) | None => Pomodoro::new(25 * 60, 5 * 60, 10 * 60).count(),
+            Some(PomoMode::Short) | None => pomodoro(25 * 60, 5 * 60, 10 * 60),
 
-            Some(PomoMode::Long) => Pomodoro::new(55 * 60, 10 * 60, 20 * 60).count(),
+            Some(PomoMode::Long) => pomodoro(55 * 60, 10 * 60, 20 * 60),
 
             Some(PomoMode::Custom {
                 work_time,
                 break_time,
                 long_break_time,
-            }) => Pomodoro::new(work_time, break_time, long_break_time).count(),
+            }) => pomodoro(work_time, break_time, long_break_time),
         },
 
-        None => Pomodoro::new(25 * 60, 5 * 60, 10 * 60).count(),
+        None => pomodoro(25 * 60, 5 * 60, 10 * 60),
     }
     .map(|counter| {
         println!("{}", fmt_time(counter));

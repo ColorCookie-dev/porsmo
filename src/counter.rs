@@ -1,6 +1,3 @@
-use anyhow::Result;
-use std::{thread, time::Duration};
-
 pub trait Counter {
     fn is_running(&self) -> bool;
 
@@ -22,21 +19,5 @@ pub trait Counter {
         } else if self.is_paused() {
             self.resume();
         }
-    }
-
-    fn update(&mut self) -> Result<()>;
-
-    fn count(&mut self) -> Result<u64> {
-        loop {
-            self.update()?;
-
-            if self.has_ended() {
-                break;
-            }
-
-            thread::sleep(Duration::from_millis(100));
-        }
-
-        Ok(self.counter())
     }
 }

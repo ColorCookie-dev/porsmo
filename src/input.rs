@@ -12,6 +12,7 @@ pub enum Command {
     Toggle,
     Enter,
     Skip,
+    Yes,
     No,
 }
 
@@ -27,6 +28,7 @@ pub fn listen_for_inputs() -> Receiver<Command> {
                 Key::Ctrl('z') => tx.try_send(Command::Quit).ok(),
 
                 Key::Char('S') => tx.try_send(Command::Skip).ok(),
+                Key::Char('y') => tx.try_send(Command::Yes).ok(),
                 Key::Char('n') => tx.try_send(Command::No).ok(),
 
                 Key::Char('\n') => tx.try_send(Command::Enter).ok(),
