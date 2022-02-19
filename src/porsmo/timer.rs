@@ -1,16 +1,14 @@
 use crate::{
-    format::fmt_time,
     input::{listen_for_inputs, Command},
-    notification::notify_default,
-    sound::play_bell,
-    terminal::{clear, show_message, show_message_green, show_message_red, show_view, TermRawMode},
+    terminal::{show_view, TermRawMode},
 };
 use anyhow::Result;
 use porsmo::{counter::Counter, stopwatch::Stopwatch, timer::Timer};
-use std::{io::Stdout, sync::mpsc::Receiver, thread, time::Duration};
-use termion::raw::RawTerminal;
+use std::{io::Write, sync::mpsc::Receiver, thread, time::Duration};
 
 pub fn timer(time: u64) -> Result<u64> {
+    use ui::*;
+
     let mut c = Timer::new(time);
     let mut stdout = &mut TermRawMode::new().stdout;
     let rx = listen_for_inputs();
@@ -53,7 +51,9 @@ pub fn timer(time: u64) -> Result<u64> {
     Ok(counter_ended_at)
 }
 
-fn start_excess_counting(rx: &Receiver<Command>, stdout: &mut RawTerminal<Stdout>) -> Result<u64> {
+fn start_excess_counting(rx: &Receiver<Command>, stdout: &mut impl Write) -> Result<u64> {
+    use ui::*;
+
     let mut st = Stopwatch::new(0);
 
     loop {
@@ -86,27 +86,38 @@ fn start_excess_counting(rx: &Receiver<Command>, stdout: &mut RawTerminal<Stdout
     Ok(st.counter())
 }
 
-fn show_timer_end(stdout: &mut RawTerminal<Stdout>, counter: u64, running: bool) -> Result<()> {
-    clear(stdout)?;
-    show_message_red(stdout, "Timer has ended", 0)?;
-    show_message(stdout, "[Q]: Quit, [Space]: Toggle excess counter", 1)?;
-    show_extended_time(stdout, counter, running)?;
-
-    Ok(())
-}
-
-fn show_extended_time(stdout: &mut RawTerminal<Stdout>, counter: u64, running: bool) -> Result<()> {
-    if running {
-        show_message_green(stdout, &format!("-{}", fmt_time(counter)), 2)?;
-    } else {
-        show_message_red(stdout, &format!("-{}", fmt_time(counter)), 2)?;
+mod ui {
+    use crate::{
+        format::fmt_time,
+        notification::notify_default,
+        sound::play_bell,
+        terminal::{clear, show_message, show_message_green, show_message_red},
     };
-    Ok(())
-}
+    use anyhow::Result;
+    use std::{io::Write, thread};
 
-fn alert_timer_end() {
-    thread::spawn(move || {
-        notify_default("Timer ended!", "You Porsmo timer has ended").unwrap();
-        play_bell().unwrap();
-    });
+    pub fn show_timer_end(stdout: &mut impl Write, counter: u64, running: bool) -> Result<()> {
+        clear(stdout)?;
+        show_message_red(stdout, "Timer has ended", 0)?;
+        show_message(stdout, "[Q]: Quit, [Space]: Toggle excess counter", 1)?;
+        show_extended_time(stdout, counter, running)?;
+
+        Ok(())
+    }
+
+    pub fn show_extended_time(stdout: &mut impl Write, counter: u64, running: bool) -> Result<()> {
+        if running {
+            show_message_green(stdout, &format!("-{}", fmt_time(counter)), 2)?;
+        } else {
+            show_message_red(stdout, &format!("-{}", fmt_time(counter)), 2)?;
+        };
+        Ok(())
+    }
+
+    pub fn alert_timer_end() {
+        thread::spawn(move || {
+            notify_default("Timer ended!", "You Porsmo timer has ended").unwrap();
+            play_bell().unwrap();
+        });
+    }
 }

@@ -1,14 +1,14 @@
 mod format;
 mod input;
 mod notification;
-mod pomodoro_term;
+mod pomodoro;
 mod sound;
-mod stopwatch_term;
+mod stopwatch;
 mod terminal;
-mod timer_term;
+mod timer;
 
 use crate::format::fmt_time;
-use crate::{pomodoro_term::pomodoro, stopwatch_term::stopwatch, timer_term::timer};
+use crate::{pomodoro::pomodoro, stopwatch::stopwatch, timer::timer};
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 
