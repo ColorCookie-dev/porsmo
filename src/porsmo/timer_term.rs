@@ -1,14 +1,12 @@
 use crate::{
-    counter::Counter,
     format::fmt_time,
     input::{listen_for_inputs, Command},
     notification::notify_default,
     sound::play_bell,
-    stopwatch::Stopwatch,
     terminal::{clear, show_message, show_message_green, show_message_red, show_view, TermRawMode},
-    timer::Timer,
 };
 use anyhow::Result;
+use porsmo::{counter::Counter, stopwatch::Stopwatch, timer::Timer};
 use std::{io::Stdout, sync::mpsc::Receiver, thread, time::Duration};
 use termion::raw::RawTerminal;
 

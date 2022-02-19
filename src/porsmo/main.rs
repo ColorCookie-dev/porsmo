@@ -1,14 +1,10 @@
-mod counter;
 mod format;
 mod input;
 mod notification;
-mod pomodoro;
 mod pomodoro_term;
 mod sound;
-mod stopwatch;
 mod stopwatch_term;
 mod terminal;
-mod timer;
 mod timer_term;
 
 use crate::format::fmt_time;

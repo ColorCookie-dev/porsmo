@@ -1,17 +1,19 @@
 use crate::{
-    counter::Counter,
     format::fmt_time,
     input::{listen_for_inputs, Command},
     notification::notify_default,
-    pomodoro::{Mode, Pomodoro},
     sound::play_bell,
-    stopwatch::Stopwatch,
     terminal::{
         clear, show_message, show_message_green, show_message_red, show_message_yellow,
         show_time_paused, show_time_running, TermRawMode,
     },
 };
 use anyhow::Result;
+use porsmo::{
+    counter::Counter,
+    pomodoro::{Mode, Pomodoro},
+    stopwatch::Stopwatch,
+};
 use std::{io::Stdout, sync::mpsc::Receiver, thread, time::Duration};
 use termion::raw::RawTerminal;
 

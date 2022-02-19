@@ -1,10 +1,9 @@
 use crate::{
-    counter::Counter,
     input::{listen_for_inputs, Command},
-    stopwatch::Stopwatch,
     terminal::{show_view, TermRawMode},
 };
 use anyhow::Result;
+use porsmo::{counter::Counter, stopwatch::Stopwatch};
 use std::{thread, time::Duration};
 
 pub fn stopwatch(time: u64) -> Result<u64> {
