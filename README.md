@@ -24,8 +24,7 @@ A rust program for pomodoro, timer, stopwatch - all in one.
   - [X] Stopwatch after the end of a mode to show exceeding time
 - [X] Stopwatch after the end of timer to show exceeding time
 - Some more refactoring
-  - [ ] Refactoring of ui modules in porsmo binary
-  - [ ] Refactoring of parameters of show\_counter into a struct
+  - [X] Refactoring of ui modules in porsmo binary
 ## Someday
 - [ ] Tracking
   - [ ] Tracking pomodoro sessions and resume feature

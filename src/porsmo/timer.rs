@@ -1,4 +1,5 @@
 use crate::{
+    alert::alert,
     format::fmt_time,
     input::{listen_for_inputs, Command},
     stopwatch::default_stopwatch_loop,
@@ -9,8 +10,6 @@ use porsmo::{counter::Counter, timer::Timer};
 use std::{io::Write, sync::mpsc::Receiver, thread, time::Duration};
 
 pub fn timer(time: u64) -> Result<u64> {
-    use ui::*;
-
     let mut c = Timer::new(time);
     let mut stdout = &mut TermRawMode::new().stdout;
     let rx = listen_for_inputs();
@@ -41,7 +40,7 @@ pub fn timer(time: u64) -> Result<u64> {
 
         if c.has_ended() {
             c.end_count();
-            alert_timer_end();
+            alert("Timer ended!".into(), "You Porsmo timer has ended".into());
             counter_ended_at = start_excess_counting(stdout, &rx)?;
             break;
         }
@@ -74,16 +73,4 @@ fn start_excess_counting(stdout: &mut impl Write, rx: &Receiver<Command>) -> Res
 
         Ok(())
     })
-}
-
-mod ui {
-    use crate::{notification::notify_default, sound::play_bell};
-    use std::thread;
-
-    pub fn alert_timer_end() {
-        thread::spawn(move || {
-            notify_default("Timer ended!", "You Porsmo timer has ended").unwrap();
-            play_bell().unwrap();
-        });
-    }
 }

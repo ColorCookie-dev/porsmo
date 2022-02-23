@@ -1,3 +1,4 @@
+mod alert;
 mod format;
 mod input;
 mod notification;
