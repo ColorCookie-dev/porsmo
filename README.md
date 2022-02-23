@@ -27,9 +27,6 @@ A rust program for pomodoro, timer, stopwatch - all in one.
   - [ ] Refactoring of ui modules in porsmo binary
   - [ ] Refactoring of parameters of show\_counter into a struct
 ## Someday
-- [ ] make the countdown not run longer when it ends
-  - Not possible now as the timer won't exit when the it ends
-  - it will continue counting excess time
 - [ ] Tracking
   - [ ] Tracking pomodoro sessions and resume feature
   - [ ] Tracking timer data in a file
