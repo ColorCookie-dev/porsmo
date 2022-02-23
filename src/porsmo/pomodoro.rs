@@ -1,6 +1,7 @@
 use crate::{
+    format::fmt_time,
     input::{listen_for_inputs, Command},
-    terminal::TermRawMode,
+    terminal::{show_counter, TermRawMode},
 };
 use anyhow::Result;
 use porsmo::{
@@ -13,7 +14,6 @@ use std::{io::Write, sync::mpsc::Receiver, thread, time::Duration};
 pub fn pomodoro(work_time: u64, break_time: u64, long_break_time: u64) -> Result<u64> {
     use ui::*;
     let mut pomo = Pomodoro::new(work_time, break_time, long_break_time);
-    let mut skip_prompt = false;
     let stdout = &mut TermRawMode::new().stdout;
     let rx = listen_for_inputs();
 
@@ -31,57 +31,47 @@ pub fn pomodoro(work_time: u64, break_time: u64, long_break_time: u64) -> Result
                 pomo.resume();
             }
 
-            Ok(Command::Toggle) => {
+            Ok(Command::Toggle) | Ok(Command::Enter) => {
                 pomo.toggle();
-            }
-
-            Ok(Command::Enter) => {
-                if skip_prompt {
-                    pomo.next_mode();
-                    skip_prompt = false;
-                } else {
-                    pomo.toggle();
-                }
-            }
-
-            Ok(Command::Yes) => {
-                if skip_prompt {
-                    pomo.next_mode();
-                    skip_prompt = false;
-                }
             }
 
             Ok(Command::Skip) => {
                 pomo.pause();
-                skip_prompt = true;
-            }
-
-            Ok(Command::No) => {
-                skip_prompt = false;
-                pomo.resume();
+                if skip_prompt(stdout, &rx, pomo.check_next_mode(), pomo.session())? {
+                    pomo.next_mode()
+                } else {
+                    pomo.resume();
+                }
             }
 
             _ => (),
         }
 
-        if skip_prompt {
-            show_prompt(stdout, pomo.mode())?;
-        } else {
-            if pomo.has_ended() {
-                alert(pomo.check_next_mode());
-                let (counter, next) =
-                    start_excess_counting(&rx, stdout, pomo.check_next_mode(), pomo.session())?;
-                if next {
-                    pomo.next_mode();
-                } else {
-                    return Ok(counter);
-                }
+        if pomo.has_ended() {
+            alert(pomo.check_next_mode());
+            let (counter, next) =
+                start_excess_counting(stdout, &rx, pomo.check_next_mode(), pomo.session())?;
+            if next {
+                pomo.next_mode();
+            } else {
+                return Ok(counter);
             }
-
-            show_counter(stdout, pomo.counter(), pomo.is_running())?;
         }
 
-        show_session(stdout, pomo.session())?;
+        let title = match pomo.mode() {
+            Mode::Work => "Pomodoro (Work)",
+            Mode::Break => "Pomodoro (Break)",
+            Mode::LongBreak => "Pomodor (Long Break)",
+        };
+
+        show_counter(
+            stdout,
+            title,
+            fmt_time(pomo.counter()),
+            pomo.is_running(),
+            "[Q]: quit, [Space]: pause/resume.",
+            format!("Round: {}", pomo.session()),
+        )?;
 
         thread::sleep(Duration::from_millis(100));
     }
@@ -89,13 +79,38 @@ pub fn pomodoro(work_time: u64, break_time: u64, long_break_time: u64) -> Result
     Ok(pomo.counter())
 }
 
-fn start_excess_counting(
-    rx: &Receiver<Command>,
+fn skip_prompt(
     stdout: &mut impl Write,
+    rx: &Receiver<Command>,
+    next_mode: Mode,
+    session: u64,
+) -> Result<bool> {
+    use ui::*;
+    loop {
+        match rx.try_recv() {
+            Ok(Command::Quit) | Ok(Command::No) => {
+                return Ok(false);
+            }
+
+            Ok(Command::Yes) | Ok(Command::Enter) => {
+                return Ok(true);
+            }
+
+            _ => (),
+        }
+
+        show_prompt_pomo(stdout, next_mode, format!("Round: {}", session))?;
+
+        thread::sleep(Duration::from_millis(100));
+    }
+}
+
+fn start_excess_counting(
+    stdout: &mut impl Write,
+    rx: &Receiver<Command>,
     next_mode: Mode,
     session: u64,
 ) -> Result<(u64, bool)> {
-    use ui::*;
     let mut st = Stopwatch::new(0);
 
     loop {
@@ -122,8 +137,20 @@ fn start_excess_counting(
             _ => (),
         }
 
-        show_mode_change(stdout, next_mode, session, st.counter(), st.is_running())?;
-        show_session(stdout, session)?;
+        let title = match next_mode {
+            Mode::Work => "Break has ended! Start work?",
+            Mode::Break => "Work has ended! Start break?",
+            Mode::LongBreak => "Work has ended! Start a long break",
+        };
+
+        show_counter(
+            stdout,
+            title,
+            format!("+{}", fmt_time(st.counter())),
+            st.is_running(),
+            "[Q]: Quit, [Enter]: Start, [Space]: toggle",
+            format!("Round: {}", session),
+        )?;
 
         thread::sleep(Duration::from_millis(100));
     }
@@ -134,29 +161,14 @@ fn start_excess_counting(
 // Purely UI and User related
 mod ui {
     use crate::{
-        format::fmt_time,
         notification::notify_default,
         pomodoro::Mode,
         sound::play_bell,
-        terminal::{
-            clear, show_message, show_message_green, show_message_red, show_message_yellow,
-            show_time_paused, show_time_running,
-        },
+        terminal::{clear, show_prompt},
     };
     use anyhow::Result;
-    use std::{io::Write, thread};
-
-    pub fn show_counter(stdout: &mut impl Write, counter: u64, running: bool) -> Result<()> {
-        if running {
-            show_time_running(stdout, counter)?;
-            show_message(stdout, "[Q]: quit, [Space]: pause/resume", 2)?;
-        } else {
-            show_time_paused(stdout, counter)?;
-            show_message(stdout, "[Q]: quit, [Space]: pause/resume", 2)?;
-        }
-
-        Ok(())
-    }
+    use std::{fmt::Display, io::Write, thread};
+    use termion::color;
 
     pub fn alert(next_mode: Mode) {
         let heading;
@@ -164,7 +176,7 @@ mod ui {
 
         match next_mode {
             Mode::Work => {
-                heading = "You break ended!";
+                heading = "Your break ended!";
                 message = "Time for some work"
             }
             Mode::Break => {
@@ -183,57 +195,16 @@ mod ui {
         });
     }
 
-    pub fn show_prompt(stdout: &mut impl Write, mode: Mode) -> Result<()> {
-        clear(stdout)?;
-        match mode {
-            Mode::Work => show_message(stdout, "skip this work session?", 0)?,
-            Mode::Break => show_message(stdout, "skip this break?", 0)?,
-            Mode::LongBreak => show_message(stdout, "skip this long break?", 0)?,
-        };
-
-        show_message(stdout, "[Q]: Quit, [Enter]: Yes, [N]: No", 2)?;
-
-        Ok(())
-    }
-
-    pub fn show_session(stdout: &mut impl Write, session: u64) -> Result<()> {
-        show_message_yellow(stdout, &format!("(Round: {})", session), 1)
-    }
-
-    pub fn show_extended_time(stdout: &mut impl Write, counter: u64, running: bool) -> Result<()> {
-        if running {
-            show_message_green(stdout, &format!("-{}", fmt_time(counter)), 3)?;
-        } else {
-            show_message_red(stdout, &format!("-{}", fmt_time(counter)), 3)?;
-        }
-
-        Ok(())
-    }
-
-    pub fn show_mode_change(
+    pub fn show_prompt_pomo(
         stdout: &mut impl Write,
         next_mode: Mode,
-        session: u64,
-        counter: u64,
-        running: bool,
+        message: impl Display,
     ) -> Result<()> {
         clear(stdout)?;
         match next_mode {
-            Mode::Work => show_message_red(stdout, "start work?", 0)?,
-            Mode::Break => show_message_green(stdout, "start break?", 0)?,
-            Mode::LongBreak => show_message_green(stdout, "start long break?", 0)?,
+            Mode::Work => show_prompt(stdout, "skip to work?", color::Red, message),
+            Mode::Break => show_prompt(stdout, "skip to break?", color::Green, message),
+            Mode::LongBreak => show_prompt(stdout, "skip to long break?", color::Green, message),
         }
-
-        show_session(stdout, session)?;
-
-        show_message(
-            stdout,
-            "[Q]: Quit, [Enter]: Start, [Space]: Toggle excess counter",
-            2,
-        )?;
-
-        show_extended_time(stdout, counter, running)?;
-
-        Ok(())
     }
 }

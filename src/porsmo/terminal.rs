@@ -1,7 +1,8 @@
-use crate::format::fmt_time;
 use anyhow::{Context, Result};
-use std::io::Write;
-use std::io::{stdout, Stdout};
+use std::{
+    fmt::Display,
+    io::{stdout, Stdout, Write},
+};
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::{clear, color, cursor};
 
@@ -49,93 +50,84 @@ pub fn clear(stdout: &mut impl Write) -> Result<()> {
     stdout.flush().with_context(|| "failed to flush stdout")
 }
 
-pub fn show_view(stdout: &mut impl Write, time: u64, running: bool) -> Result<()> {
-    show_time(stdout, time, running)?;
-    show_message(stdout, "[Q]: quit, [Space]: pause/resume", 1)
+pub fn show_time(
+    stdout: &mut impl Write,
+    time: impl Display,
+    running: bool,
+    pos: Pos,
+) -> Result<()> {
+    if running {
+        show_text(stdout, time, color::Green, pos)?;
+    } else {
+        show_text(stdout, time, color::Red, pos)?;
+    }
+    Ok(())
 }
 
-pub fn show_time(stdout: &mut impl Write, time: u64, running: bool) -> Result<()> {
-    if running {
-        show_time_running(stdout, time)
-    } else {
-        show_time_paused(stdout, time)
+pub fn show_counter(
+    stdout: &mut impl Write,
+    title: impl Display,
+    time: impl Display,
+    running: bool,
+    controls: impl Display,
+    message: impl Display,
+) -> Result<()> {
+    clear(stdout)?;
+    show_text(stdout, title, color::Magenta, (1, 1).into())?;
+    show_time(stdout, time, running, (1, 2).into())?;
+    show_text(stdout, controls, color::Magenta, (1, 3).into())?;
+    show_text(stdout, message, color::LightYellow, (1, 4).into())?;
+
+    Ok(())
+}
+
+pub struct Pos {
+    right: u16,
+    down: u16,
+}
+
+impl From<(u16, u16)> for Pos {
+    fn from(pos: (u16, u16)) -> Self {
+        let (right, down) = pos;
+        Self { right, down }
     }
 }
 
-pub fn show_time_paused(stdout: &mut impl Write, time: u64) -> Result<()> {
+pub fn show_text(
+    stdout: &mut impl Write,
+    text: impl Display,
+    color: impl color::Color,
+    pos: Pos,
+) -> Result<()> {
     write!(
         stdout,
-        "{clear}{cursor}{color}{time}",
-        clear = clear::All,
-        color = color::Fg(color::Red),
-        cursor = cursor::Goto(1, 1),
-        time = fmt_time(time)
+        "{cursor}{color}{text}",
+        color = color::Fg(color),
+        cursor = cursor::Goto(pos.right, pos.down),
+        text = text,
     )
     .with_context(|| "failed to display timer")?;
 
     stdout.flush().with_context(|| "failed to flush stdout")
 }
 
-pub fn show_time_running(stdout: &mut impl Write, time: u64) -> Result<()> {
-    write!(
+pub fn show_prompt(
+    stdout: &mut impl Write,
+    prompt: impl Display,
+    prompt_color: impl color::Color,
+    message: impl Display,
+) -> Result<()> {
+    clear(stdout)?;
+    show_text(stdout, prompt, prompt_color, (1, 1).into())?;
+    show_text(
         stdout,
-        "{clear}{cursor}{color}{time}",
-        clear = clear::All,
-        color = color::Fg(color::Green),
-        cursor = cursor::Goto(1, 1),
-        time = fmt_time(time)
-    )
-    .with_context(|| "failed to display timer")?;
+        "[Enter]: Yes, [Q/N]: No",
+        color::Magenta,
+        (1, 2).into(),
+    )?;
+    show_text(stdout, message, color::LightYellow, (1, 3).into())?;
 
-    stdout.flush().with_context(|| "failed to flush stdout")
-}
-
-pub fn show_message(stdout: &mut impl Write, msg: &str, down: u16) -> Result<()> {
-    write!(
-        stdout,
-        "{cursor}{color}{time}",
-        cursor = cursor::Goto(1, 1 + down),
-        color = color::Fg(color::Magenta),
-        time = msg
-    )
-    .with_context(|| "failed to display message")?;
-    stdout.flush().with_context(|| "failed to flush stdout")
-}
-
-pub fn show_message_red(stdout: &mut impl Write, msg: &str, down: u16) -> Result<()> {
-    write!(
-        stdout,
-        "{cursor}{color}{time}",
-        cursor = cursor::Goto(1, 1 + down),
-        color = color::Fg(color::Red),
-        time = msg
-    )
-    .with_context(|| "failed to display message")?;
-    stdout.flush().with_context(|| "failed to flush stdout")
-}
-
-pub fn show_message_yellow(stdout: &mut impl Write, msg: &str, down: u16) -> Result<()> {
-    write!(
-        stdout,
-        "{cursor}{color}{time}",
-        cursor = cursor::Goto(1, 1 + down),
-        color = color::Fg(color::LightYellow),
-        time = msg
-    )
-    .with_context(|| "failed to display message")?;
-    stdout.flush().with_context(|| "failed to flush stdout")
-}
-
-pub fn show_message_green(stdout: &mut impl Write, msg: &str, down: u16) -> Result<()> {
-    write!(
-        stdout,
-        "{cursor}{color}{time}",
-        cursor = cursor::Goto(1, 1 + down),
-        color = color::Fg(color::Green),
-        time = msg
-    )
-    .with_context(|| "failed to display message")?;
-    stdout.flush().with_context(|| "failed to flush stdout")
+    Ok(())
 }
 
 #[cfg(test)]
