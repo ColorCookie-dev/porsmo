@@ -1,14 +1,20 @@
-#+TITLE: Readme
+# Porsmo
+A rust program for pomodoro, timer, stopwatch - all in one.
 
-* Project Goal
+# Project Goal
 - Personal project
 - All in one with good accuracy
   - Timer
   - Stopwatch
   - Pomodoro
 
-* Roadmap
-** In immediate future
+# Roadmap
+## Some info
+- The Project is close to done
+- i.e. It is close to how I wanted it to be
+- New features will be added and bug fixes will be done
+- however not as urgently
+## In immediate future
 - [X] Add direct time input
 - [X] Add short and long command for subcommand
 - [X] Add pomodoro feature
@@ -16,8 +22,11 @@
   - [X] Work timer
   - [X] Sessions (rounds of 4 block)
   - [X] Stopwatch after the end of a mode to show exceeding time
-- [ ] Stopwatch after the end of timer to show exceeding time
-** Someday
+- [X] Stopwatch after the end of timer to show exceeding time
+- Some more refactoring
+  - [ ] Refactoring of ui modules in porsmo binary
+  - [ ] Refactoring of parameters of show\_counter into a struct
+## Someday
 - [ ] make the countdown not run longer when it ends
   - Not possible now as the timer won't exit when the it ends
   - it will continue counting excess time
@@ -25,7 +34,7 @@
   - [ ] Tracking pomodoro sessions and resume feature
   - [ ] Tracking timer data in a file
 - [ ] reading config for pomodoro timers in a file
-** I'll think about it
+## I'll think about it
 - Alarm (works like timer, but accepts absolute time rather than a period of time)
 - Stopwatch
 - Server and GUI client or inbuild gui
