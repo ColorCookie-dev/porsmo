@@ -1,8 +1,8 @@
 [package]
 name = "porsmo"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
-readme = "README.org"
+readme = "README.md"
 license = "MIT"
 description = "A pomodoro, timer and stopwatch, all in one app"
 homepage = "https://github.com/ColorCookie-dev/porsmo"

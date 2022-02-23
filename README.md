@@ -33,4 +33,4 @@ A rust program for pomodoro, timer, stopwatch - all in one.
 ## I'll think about it
 - Alarm (works like timer, but accepts absolute time rather than a period of time)
 - Stopwatch
-- Server and GUI client or inbuild gui
+- Server and GUI client or inbuilt gui
