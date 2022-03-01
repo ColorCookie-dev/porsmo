@@ -1,14 +1,9 @@
-mod alert;
-mod format;
 mod input;
-mod notification;
 mod pomodoro;
-mod sound;
 mod stopwatch;
 mod terminal;
 mod timer;
 
-use crate::format::fmt_time;
 use crate::{pomodoro::pomodoro, stopwatch::stopwatch, timer::timer};
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
@@ -77,6 +72,8 @@ enum PomoMode {
 }
 
 fn main() -> Result<()> {
+    log4rs::init_file("logging_config.yaml", Default::default()).unwrap();
+
     let args = Cli::parse();
     match args.mode {
         Some(Modes::Stopwatch { time }) => stopwatch(time),
@@ -97,9 +94,6 @@ fn main() -> Result<()> {
 
         None => pomodoro(25 * 60, 5 * 60, 10 * 60),
     }
-    .map(|counter| {
-        println!("{}", fmt_time(counter));
-    })
 }
 
 fn parse_time(time_str: &str) -> Result<u64> {

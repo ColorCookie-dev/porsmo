@@ -30,6 +30,7 @@ A rust program for pomodoro, timer, stopwatch - all in one.
   - [ ] Tracking pomodoro sessions and resume feature
   - [ ] Tracking timer data in a file
 - [ ] reading config for pomodoro timers in a file
+- [ ] ticking sound when, pomodoro work timer is running
 ## I'll think about it
 - Alarm (works like timer, but accepts absolute time rather than a period of time)
 - Stopwatch

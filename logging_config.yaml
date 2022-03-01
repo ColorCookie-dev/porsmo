@@ -1,0 +1,15 @@
+appenders:
+  my_stdout:
+    kind: console
+    encoder:
+      pattern: "{h({d(%Y-%m-%d %H:%M:%S)(utc)} - {l}: {m}{n})}"
+  log_file:
+    kind: file
+    path: "log/porsmo.log"
+    encoder:
+      pattern: "{d(%Y-%m-%d %H:%M:%S)(utc)} - {h({l})}: {m}{n}"
+root:
+  level: debug
+  appenders:
+    - my_stdout
+    - log_file
