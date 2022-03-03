@@ -86,4 +86,9 @@ impl TimeCount {
             Status::Paused => self.elapsed,
         }
     }
+
+    pub fn reset(&mut self) {
+        self.elapsed = Duration::from_secs(0);
+        self.started = Instant::now();
+    }
 }

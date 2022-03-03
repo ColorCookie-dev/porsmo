@@ -11,8 +11,8 @@ use termion::color;
 pub fn timer(time: u64) -> Result<()> {
     let mut stdout = RawTerm::default();
     let rx = listen_command();
-    let mut counter = Timer::new(Duration::from_secs(time));
     let mut alerted = false;
+    let mut counter = Timer::new(Duration::from_secs(time));
 
     loop {
         stdout.clear()?;
@@ -30,11 +30,6 @@ pub fn timer(time: u64) -> Result<()> {
                 stdout.write_line(fmt_time(c.as_secs()))?;
             }
             CountType::Exceed(c) => {
-                if !alerted {
-                    alerted = true;
-                    alert("Timer ended".into(), "Your timer has ended".into());
-                }
-
                 stdout.set_color(color::Magenta)?;
                 stdout.write_line("Timer ended!")?;
 
@@ -63,6 +58,11 @@ pub fn timer(time: u64) -> Result<()> {
             }
 
             _ => (),
+        }
+
+        if counter.has_ended() && alerted == false {
+            alerted = true;
+            alert("Timer ended".into(), "Your timer has ended".into());
         }
 
         thread::sleep(Duration::from_millis(100));

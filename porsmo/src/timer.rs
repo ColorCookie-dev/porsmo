@@ -1,5 +1,5 @@
 use crate::counter::TimeCount;
-use std::time::Duration;
+use std::{sync::Arc, thread, time::Duration};
 
 pub enum CountType {
     Count(Duration),
@@ -17,6 +17,20 @@ impl Timer {
             counter: TimeCount::default(),
             target,
         }
+    }
+
+    pub fn attach_alert(self, alert: fn()) -> Arc<Timer> {
+        let timer = Arc::new(self);
+
+        let timer_clone = timer.clone();
+        thread::spawn(move || {
+            while !timer_clone.has_ended() {
+                thread::sleep(Duration::from_millis(200));
+            }
+            alert();
+        });
+
+        timer
     }
 
     pub fn is_running(&self) -> bool {
@@ -48,5 +62,9 @@ impl Timer {
 
     pub fn toggle(&mut self) {
         self.counter.toggle();
+    }
+
+    pub fn reset(&mut self) {
+        self.counter.reset();
     }
 }

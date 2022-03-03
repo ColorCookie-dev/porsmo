@@ -42,18 +42,6 @@ pub struct Pomodoro {
     options: PomoSettings,
 }
 
-impl Default for Pomodoro {
-    fn default() -> Self {
-        let def_opts = PomoSettings::default();
-        Self {
-            counter: Timer::new(def_opts.work),
-            session: 0,
-            mode: Mode::Work,
-            options: def_opts,
-        }
-    }
-}
-
 impl Pomodoro {
     pub fn new(work: Duration, rest: Duration, long_rest: Duration) -> Self {
         let options = PomoSettings::new(work, rest, long_rest);
@@ -124,6 +112,10 @@ impl Pomodoro {
                 self.session += 1;
             }
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.counter.reset();
     }
 
     pub fn counter_at(&self) -> CountType {
