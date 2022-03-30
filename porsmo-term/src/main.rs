@@ -1,7 +1,9 @@
+#[macro_use]
+mod terminal;
+
 mod input;
 mod pomodoro;
 mod stopwatch;
-mod terminal;
 mod timer;
 
 use crate::{pomodoro::pomodoro, stopwatch::stopwatch, timer::timer};

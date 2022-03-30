@@ -1,78 +1,68 @@
 use crate::{
     input::{listen_command, Command},
-    terminal::RawTerm,
+    writeraw,
 };
 use anyhow::Result;
-use porsmo::timer::{CountType, Timer};
+use porsmo::{counter::*, timer::*};
 use porsmo_helpers::{alert, fmt_time};
-use std::{thread, time::Duration};
-use termion::color;
+use std::{
+    io::{stdout, Write},
+    thread,
+    time::Duration,
+};
+
+use termion::{color, raw::IntoRawMode};
 
 pub fn timer(time: u64) -> Result<()> {
-    let mut stdout = RawTerm::default();
-    let rx = listen_command();
-    let mut alerted = false;
     let mut counter = Timer::new(Duration::from_secs(time));
 
-    loop {
-        stdout.clear()?;
-        match counter.counter_at() {
-            CountType::Count(c) => {
-                stdout.set_color(color::Magenta)?;
-                stdout.write_line("Timer")?;
+    {
+        let mut stdout = stdout().into_raw_mode()?;
+        let rx = listen_command();
+        let mut alerted = false;
 
-                if counter.is_running() {
-                    stdout.set_color(color::Green)?;
-                } else {
-                    stdout.set_color(color::Red)?;
+        loop {
+            writeraw!(stdout, clear);
+            match counter.checked_counter_at() {
+                CountType::Count(c) => {
+                    writeraw! {
+                        stdout,
+                        %text "Timer", color color::Magenta, (1, 1)%,
+                        %text fmt_time(c.as_secs()), runcolor counter.is_running(), (1, 2)%,
+                    }
                 }
-
-                stdout.write_line(fmt_time(c.as_secs()))?;
-            }
-            CountType::Exceed(c) => {
-                stdout.set_color(color::Magenta)?;
-                stdout.write_line("Timer ended!")?;
-
-                if counter.is_running() {
-                    stdout.set_color(color::Green)?;
-                } else {
-                    stdout.set_color(color::Red)?;
+                CountType::Exceed(c) => {
+                    writeraw! {
+                        stdout,
+                        %text "Timer ended!", color color::Magenta, (1, 1)%,
+                        %text format_args!("+{}", fmt_time(c.as_secs())),
+                            runcolor counter.is_running(), (1, 2)%,
+                    }
                 }
-
-                stdout.write_line(format!("+{}", fmt_time(c.as_secs())))?;
-            }
-        }
-
-        stdout.set_color(color::LightYellow)?;
-        stdout.write_line("[Q]: Quit, [Space]: pause/resume")?;
-
-        stdout.flush()?;
-
-        match rx.try_recv() {
-            Ok(Command::Quit) => {
-                break;
             }
 
-            Ok(Command::Space) | Ok(Command::Enter) => {
-                counter.toggle();
+            writeraw!(
+                stdout,
+                %text "[Q]: Quit, [Space]: pause/resume", color color::LightYellow, (1, 3)%
+            );
+
+            stdout.flush()?;
+
+            match rx.try_recv() {
+                Ok(Command::Quit) => break,
+                Ok(Command::Space) | Ok(Command::Enter) => counter.toggle(),
+                _ => (),
             }
 
-            _ => (),
-        }
+            if counter.has_ended() && alerted == false {
+                alerted = true;
+                alert("Timer ended".into(), "Your timer has ended".into());
+            }
 
-        if counter.has_ended() && alerted == false {
-            alerted = true;
-            alert("Timer ended".into(), "Your timer has ended".into());
+            thread::sleep(Duration::from_millis(100));
         }
-
-        thread::sleep(Duration::from_millis(100));
     }
 
-    stdout.destroy();
-    match counter.counter_at() {
-        CountType::Count(c) => println!("{}", fmt_time(c.as_secs())),
-        CountType::Exceed(c) => println!("+{}", fmt_time(c.as_secs())),
-    };
-
+    println!();
     Ok(())
 }

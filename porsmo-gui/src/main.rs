@@ -1,7 +1,7 @@
 use eframe::{egui, epi};
 use log::{info, warn};
-use porsmo::pomodoro::{CountType, Pomodoro};
-use porsmo_helpers::{alert, fmt_time};
+use porsmo::pomodoro::*;
+use porsmo_helpers::{alert_pomo, fmt_time};
 use std::time::Duration;
 
 // #[derive(Default)]
@@ -17,6 +17,7 @@ impl Default for Porsmo {
                 Duration::from_secs(25 * 60),
                 Duration::from_secs(5 * 60),
                 Duration::from_secs(10 * 60),
+                alert_pomo,
             ),
             alerted: false,
         }
@@ -33,7 +34,7 @@ impl Porsmo {
 impl Porsmo {
     fn alert(&mut self) {
         self.alerted = true;
-        alert("Pomodoro ended".into(), "Your pomodoro has ended!".into());
+        alert_pomo(self.pomo.check_next_mode());
     }
 
     fn has_alerted(&self) -> bool {
@@ -74,7 +75,7 @@ impl epi::App for Porsmo {
                 ctx.set_visuals(egui::Visuals::light());
             }
 
-            match self.pomo.counter_at() {
+            match self.pomo.checked_counter_at() {
                 CountType::Count(c) => {
                     if self.pomo.is_paused() {
                         ui.visuals_mut().override_text_color = Some(egui::Color32::RED);

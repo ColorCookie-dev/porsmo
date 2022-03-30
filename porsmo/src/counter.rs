@@ -1,18 +1,25 @@
 use std::time::{Duration, Instant};
 
+pub trait Pausable {
+    fn is_paused(&self) -> bool;
+    fn is_running(&self) -> bool;
+
+    fn pause(&mut self);
+    fn resume(&mut self);
+    fn toggle(&mut self);
+}
+
+pub trait Reset {
+    fn reset(&mut self);
+}
+
+pub trait Counter<T> {
+    fn counter_at(&self) -> T;
+}
+
 pub enum Status {
     Running,
     Paused,
-}
-
-impl Status {
-    pub fn is_running(&self) -> bool {
-        matches!(self, Self::Running)
-    }
-
-    pub fn is_paused(&self) -> bool {
-        matches!(self, Self::Paused)
-    }
 }
 
 impl Default for Status {
@@ -45,50 +52,59 @@ impl TimeCount {
         }
     }
 
-    pub fn is_running(&self) -> bool {
-        self.status.is_running()
+    fn unchecked_pause(&mut self) {
+        self.status = Status::Paused;
+        self.elapsed += self.started.elapsed();
     }
 
-    pub fn is_paused(&self) -> bool {
-        self.status.is_paused()
+    fn unchecked_resume(&mut self) {
+        self.status = Status::Running;
+        self.started = Instant::now();
     }
+}
 
-    pub fn pause(&mut self) {
-        if self.is_running() {
-            self.status = Status::Paused;
-            self.elapsed += self.started.elapsed();
-        }
+impl Reset for TimeCount {
+    fn reset(&mut self) {
+        self.elapsed = Duration::from_secs(0);
+        self.started = Instant::now();
     }
+}
 
-    pub fn resume(&mut self) {
-        if self.is_paused() {
-            self.status = Status::Running;
-            self.started = Instant::now();
-        }
-    }
-
-    pub fn toggle(&mut self) {
-        match self.status {
-            Status::Running => {
-                self.status = Status::Paused;
-                self.elapsed += self.started.elapsed();
-            }
-            Status::Paused => {
-                self.status = Status::Running;
-                self.started = Instant::now();
-            }
-        }
-    }
-
-    pub fn counter_at(&self) -> Duration {
+impl Counter<Duration> for TimeCount {
+    fn counter_at(&self) -> Duration {
         match self.status {
             Status::Running => self.elapsed + self.started.elapsed(),
             Status::Paused => self.elapsed,
         }
     }
+}
 
-    pub fn reset(&mut self) {
-        self.elapsed = Duration::from_secs(0);
-        self.started = Instant::now();
+impl Pausable for TimeCount {
+    fn is_running(&self) -> bool {
+        matches!(self.status, Status::Running)
+    }
+
+    fn is_paused(&self) -> bool {
+        matches!(self.status, Status::Paused)
+    }
+
+    fn pause(&mut self) {
+        if self.is_running() {
+            self.unchecked_resume();
+        }
+    }
+
+    fn resume(&mut self) {
+        if self.is_paused() {
+            self.unchecked_pause();
+        }
+    }
+
+    fn toggle(&mut self) {
+        if self.is_running() {
+            self.unchecked_pause();
+        } else if self.is_paused() {
+            self.unchecked_resume();
+        }
     }
 }

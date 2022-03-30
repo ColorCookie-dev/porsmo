@@ -1,92 +1,70 @@
-use std::{
-    fmt::Display,
-    io::{stdout, Stdout, Write},
-};
-use termion::{
-    clear, color, cursor,
-    raw::{IntoRawMode, RawTerminal},
-};
+// This macro makes it easier to work with raw terminal output,
+// with this macro, there is no need to specify format specifiers e.g "{}{}{}"
+// following the DRY rule, it also has some shorthand for colors, gotos,
+// clear, and "runcolor" (which is used to specify the color according to the
+// state of the counter.
+#[macro_export]
+macro_rules! writeraw {
+    // Base case
+    ($out:expr$(,)?) => {};
 
-pub struct RawTerm<T>
-where
-    T: Write,
-{
-    out: RawTerminal<T>,
-    line_no: u16,
-}
+    // Clears Screen
+    ($out:expr, clear$(, $($ts:tt)*)?) => {{
+        use termion::clear;
+        write!($out, "{}", clear::All).unwrap();
+        $(writeraw!($out, $($ts)*);)?
+    }};
 
-#[allow(dead_code)]
-impl<T: Write> RawTerm<T> {
-    pub fn new(out: T) -> Result<Self, std::io::Error> {
-        Ok(Self {
-            out: out.into_raw_mode()?,
-            line_no: 0,
-        })
-    }
-
-    pub fn get_out(&mut self) -> &mut RawTerminal<T> {
-        &mut self.out
-    }
-
-    pub fn set_color(&mut self, color: impl color::Color) -> Result<(), std::io::Error> {
-        write!(self.out, "{}", color::Fg(color))
-    }
-
-    pub fn write_raw_line(&mut self, show: impl Display, line: u16) -> Result<(), std::io::Error> {
-        write!(
-            self.out,
-            "{goto}{show}",
-            goto = cursor::Goto(1, line),
-            show = show
-        )
-    }
-
-    pub fn write_line(&mut self, show: impl Display) -> Result<(), std::io::Error> {
-        self.line_no += 1;
-        self.write_raw_line(show, self.line_no)
-    }
-
-    pub fn reset_line_no(&mut self) {
-        self.line_no = 0;
-    }
-
-    pub fn clear(&mut self) -> Result<(), std::io::Error> {
-        self.reset_line_no();
-        write!(self.out, "{}", clear::All)
-    }
-
-    pub fn flush(&mut self) -> Result<(), std::io::Error> {
-        self.out.flush()
-    }
-
-    pub fn reset(&mut self) -> Result<(), std::io::Error> {
-        self.reset_line_no();
-        write!(
-            self.out,
-            "{top}{clear}{show}{color}",
-            top = cursor::Goto(1, 1),
-            clear = clear::All,
-            color = color::Fg(color::Reset),
-            show = termion::cursor::Show
-        )?;
-
-        self.out.flush()
-    }
-
-    pub fn destroy(self) {}
-}
-
-impl Default for RawTerm<Stdout> {
-    fn default() -> Self {
-        Self {
-            out: stdout().into_raw_mode().unwrap(),
-            line_no: 0,
+    // Set color according to a boolean specifying if counter is running
+    ($out:expr, runcolor $running:expr$(, $($ts:tt)*)?) => {{
+        use termion::color::{Green, Red, Fg};
+        if $running {
+            write!($out, "{}", Fg(Green)).unwrap();
+        } else {
+            write!($out, "{}", Fg(Red)).unwrap();
         }
-    }
-}
+        $(writeraw!($out, $($ts)*);)?
+    }};
 
-impl<T: Write> Drop for RawTerm<T> {
-    fn drop(&mut self) {
-        self.reset().ok();
-    }
+    // Set color for terminal
+    ($out:expr, color $color:expr$(, $($ts:tt)*)?) => {{
+        use termion::color;
+        write!($out, "{}", color::Fg($color)).unwrap();
+        $(writeraw!($out, $($ts)*);)?
+    }};
+
+    // Goto a particular column and line
+    ($out:expr, ($x:expr, $y:expr)$(, $($ts:tt)*)?) => {{
+        use termion::cursor::Goto;
+        write!($out, "{}", Goto($x, $y)).unwrap();
+        $(writeraw!($out, $($ts)*);)?
+    }};
+
+    // Prints text onto terminal
+    ($out:expr, text $t:expr$(, $($ts:tt)*)?) => {{
+        write!($out, "{}", $t).unwrap();
+        $(writeraw!($out, $($ts)*);)?
+    }};
+
+    // The rules below are for printing on a line with swapped orders
+    // These special rules allow for text to be specified first before color and goto
+    // somewhat maintaining the readability
+    ($out:expr, %text $t:expr, color $color:expr, ($x:expr, $y:expr)%$(, $($ts:tt)*)?) => {{
+        use termion::{color::Fg, cursor::Goto};
+        write!($out, "{co}{go}{te}", te = $t, go = Goto($x, $y), co = Fg($color)).unwrap();
+        $(writeraw!($out, $($ts)*);)?
+    }};
+
+    ($out:expr, %text $t:expr, runcolor $running:expr, ($x:expr, $y:expr)%$(, $($ts:tt)*)?) => {{
+        use termion::cursor::Goto;
+        writeraw!($out, runcolor $running);
+        write!($out, "{go}{te}", te = $t, go = Goto($x, $y)).unwrap();
+        $(writeraw!($out, $($ts)*);)?
+    }};
+
+    ($out:expr, %text $t:expr, ($x:expr, $y:expr)%$(, $($ts:tt)*)?) => {{
+        use termion::cursor::Goto;
+        write!($out, "{go}{te}", te = $t, go = Goto($x, $y)).unwrap();
+        $(writeraw!($out, $($ts)*);)?
+    }};
 }

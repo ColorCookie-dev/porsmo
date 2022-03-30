@@ -5,6 +5,7 @@ use std::{
 };
 use termion::{event::Key, input::TermRead};
 
+#[derive(Debug)]
 pub enum Command {
     Quit,
     Space,

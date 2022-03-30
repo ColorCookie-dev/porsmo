@@ -1,197 +1,130 @@
 use crate::{
     input::{listen_command, Command},
-    terminal::RawTerm,
+    writeraw,
 };
 use anyhow::Result;
-use porsmo::pomodoro::{CountType, Mode, Pomodoro};
-use porsmo_helpers::{alert, fmt_time};
-use std::{io::Write, sync::mpsc::Receiver, thread, time::Duration};
-use termion::color;
+use porsmo::pomodoro::*;
+use porsmo_helpers::{alert_pomo, fmt_time};
+use std::{
+    io::{stdout, Write},
+    sync::mpsc::Receiver,
+    thread,
+    time::Duration,
+};
+use termion::{color, raw::IntoRawMode};
 
 pub fn pomodoro(work: u64, rest: u64, long_rest: u64) -> Result<()> {
-    let mut stdout = RawTerm::default();
-    let rx = listen_command();
-    let mut alerted = false;
-
     let mut counter = Pomodoro::new(
         Duration::from_secs(work),
         Duration::from_secs(rest),
         Duration::from_secs(long_rest),
+        alert_pomo,
     );
 
-    loop {
-        stdout.clear()?;
-        match counter.counter_at() {
-            CountType::Count(c) => {
-                stdout.set_color(color::Magenta)?;
+    {
+        let mut stdout = stdout().into_raw_mode()?;
+        let rx = listen_command();
 
-                match counter.mode() {
-                    Mode::Work => stdout.write_line("Pomodoro (Work)")?,
-                    Mode::Rest => stdout.write_line("Pomodoro (Break)")?,
-                    Mode::LongRest => stdout.write_line("Pomodoro (Long Break)")?,
-                }
+        loop {
+            let (title, count, control) = match counter.checked_counter_at() {
+                CountType::Count(count) => (
+                    get_pomo_title(*counter.mode()),
+                    fmt_time(count.as_secs()),
+                    "[Q]: Quit, [Space]: pause/resume",
+                ),
+                CountType::Exceed(count) => (
+                    get_rest_title(*counter.mode()),
+                    format!("+{}", fmt_time(count.as_secs())),
+                    "[Q]: Quit, [Space]: pause/resume, [Enter]: next session",
+                ),
+            };
 
-                if counter.is_running() {
-                    stdout.set_color(color::Green)?;
-                } else {
-                    stdout.set_color(color::Red)?;
-                }
-
-                stdout.write_line(fmt_time(c.as_secs()))?;
-
-                stdout.set_color(color::LightYellow)?;
-                stdout.write_line("[Q]: Quit, [Space]: pause/resume")?;
+            writeraw! {
+                stdout, clear,
+                %text title, color color::Magenta, (1, 1)%,
+                %text count, runcolor counter.is_running(),(1, 2)%,
+                %text control, color color::LightYellow, (1, 3)%,
+                %text format_args!("Round: {}", counter.session()), (1, 4)%,
             }
-            CountType::Exceed(c) => {
-                if !alerted {
-                    alerted = true;
-                    alert_pomo(counter.check_next_mode());
-                }
 
-                match counter.mode() {
-                    Mode::Work => {
-                        stdout.set_color(color::Magenta)?;
-                        stdout.write_line("Time for some break!")?;
+            stdout.flush()?;
+
+            match rx.try_recv() {
+                Ok(Command::Quit) => break,
+                Ok(Command::Skip) => {
+                    counter.pause();
+                    if skip_prompt(&mut stdout, &rx, &mut counter)? {
+                        break;
                     }
-                    Mode::Rest => {
-                        stdout.set_color(color::Magenta)?;
-                        stdout.write_line("Time to get back to work")?;
-                    }
-                    Mode::LongRest => {
-                        stdout.set_color(color::Magenta)?;
-                        stdout.write_line("Your break has ended!")?;
-                    }
+                    counter.resume();
                 }
-
-                if counter.is_running() {
-                    stdout.set_color(color::Green)?;
-                } else {
-                    stdout.set_color(color::Red)?;
-                }
-
-                stdout.write_raw_line(format!("+{}", fmt_time(c.as_secs())), 2)?;
-
-                stdout.set_color(color::LightYellow)?;
-                stdout.write_line("[Q]: Quit, [Space]: pause/resume, [Enter]: next session")?;
+                Ok(Command::Enter) if counter.has_ended() => counter.next_mode(),
+                Ok(Command::Enter) | Ok(Command::Space) => counter.toggle(),
+                _ => (),
             }
+
+            thread::sleep(Duration::from_millis(100));
         }
-
-        stdout.set_color(color::LightCyan)?;
-        stdout.write_line(format!("Round: {}", counter.session()))?;
-
-        stdout.flush()?;
-
-        match rx.try_recv() {
-            Ok(Command::Quit) => {
-                break;
-            }
-
-            Ok(Command::Space) => {
-                counter.toggle();
-            }
-
-            Ok(Command::Skip) => {
-                counter.pause();
-
-                match skip_prompt(
-                    &mut stdout,
-                    &rx,
-                    counter.check_next_mode(),
-                    counter.session(),
-                )? {
-                    SkipAns::Skip => {
-                        counter.next_mode();
-                        alerted = false;
-                    }
-                    SkipAns::Quit => break,
-                    SkipAns::No => (),
-                };
-
-                counter.resume();
-            }
-
-            Ok(Command::Enter) => {
-                if counter.has_ended() {
-                    counter.next_mode();
-                    alerted = false;
-                }
-            }
-
-            _ => (),
-        }
-
-        thread::sleep(Duration::from_millis(100));
     }
 
-    stdout.destroy();
-    match counter.counter_at() {
-        CountType::Count(c) => println!("{}", fmt_time(c.as_secs())),
-        CountType::Exceed(c) => println!("+{}", fmt_time(c.as_secs())),
-    };
+    println!();
+    Ok(())
+}
+
+fn skip_prompt(
+    stdout: &mut impl Write,
+    rx: &Receiver<Command>,
+    counter: &mut Pomodoro,
+) -> Result<bool> {
+    loop {
+        view_skip_prompt(stdout, counter.check_next_mode(), counter.session())?;
+        match rx.try_recv() {
+            Ok(Command::Quit) => return Ok(true),
+            Ok(Command::Yes) | Ok(Command::Enter) | Ok(Command::Space) => {
+                counter.next_mode();
+                return Ok(false);
+            }
+            _ => (),
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+}
+
+fn view_skip_prompt(stdout: &mut impl Write, next_mode: Mode, session: u64) -> Result<()> {
+    let prompt = get_skip_prompt(next_mode);
+
+    writeraw! {
+        stdout, clear,
+        %text prompt, (1, 1)%,
+        %text "[Q]: Quit, [Y]: Yes, [N]: No", color color::LightYellow, (1, 2)%,
+        %text format_args!("Round: {}", session), (1, 3)%,
+    }
+
+    stdout.flush()?;
 
     Ok(())
 }
 
-enum SkipAns {
-    Skip,
-    No,
-    Quit,
-}
-
-fn skip_prompt<T: Write>(
-    stdout: &mut RawTerm<T>,
-    rx: &Receiver<Command>,
-    next_mode: Mode,
-    session: u64,
-) -> Result<SkipAns> {
-    loop {
-        match rx.try_recv() {
-            Ok(Command::Quit) => {
-                return Ok(SkipAns::Quit);
-            }
-
-            Ok(Command::No) => {
-                return Ok(SkipAns::No);
-            }
-
-            Ok(Command::Yes) | Ok(Command::Enter) | Ok(Command::Space) => {
-                return Ok(SkipAns::Skip);
-            }
-
-            _ => (),
-        }
-
-        stdout.clear()?;
-        match next_mode {
-            Mode::Work => {
-                stdout.set_color(color::Red)?;
-                stdout.write_line("Skip to work?")?;
-            }
-            Mode::Rest => {
-                stdout.set_color(color::Green)?;
-                stdout.write_line("Skip to break?")?;
-            }
-            Mode::LongRest => {
-                stdout.set_color(color::Green)?;
-                stdout.write_line("Skip to a long break?")?;
-            }
-        }
-
-        stdout.set_color(color::LightYellow)?;
-        stdout.write_line("[Q]: Quit, [Y]: Yes, [N]: No")?;
-        stdout.write_line(format!("Round: {}", session))?;
-        stdout.flush()?;
-
-        thread::sleep(Duration::from_millis(100));
+fn get_pomo_title(mode: Mode) -> &'static str {
+    match mode {
+        Mode::Work => "pomodoro (work)",
+        Mode::Rest => "pomodoro (break)",
+        Mode::LongRest => "pomodoro (long break)",
     }
 }
 
-pub fn alert_pomo(next_mode: Mode) {
-    let (heading, message) = match next_mode {
-        Mode::Work => ("Your break ended!", "Time for some work"),
-        Mode::Rest => ("Pomodoro ended!", "Time for a short break"),
-        Mode::LongRest => ("Pomodoro 4 sessions complete!", "Time for a long break"),
-    };
+fn get_rest_title(mode: Mode) -> &'static str {
+    match mode {
+        Mode::Work => "Time for some break!",
+        Mode::Rest => "Time to get back to work",
+        Mode::LongRest => "Your break has ended!",
+    }
+}
 
-    alert(heading.into(), message.into());
+fn get_skip_prompt(next_mode: Mode) -> String {
+    match next_mode {
+        Mode::Work => format!("{}Skip to work?", color::Fg(color::Red)),
+        Mode::Rest => format!("{}Skip to break?", color::Fg(color::Green)),
+        Mode::LongRest => format!("{}Skip to a long break?", color::Fg(color::Green)),
+    }
 }

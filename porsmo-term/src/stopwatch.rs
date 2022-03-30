@@ -1,54 +1,47 @@
 use crate::{
     input::{listen_command, Command},
-    terminal::RawTerm,
+    writeraw,
 };
 use anyhow::Result;
-use porsmo::stopwatch::Stopwatch;
+use porsmo::{counter::*, stopwatch::Stopwatch};
 use porsmo_helpers::fmt_time;
-use std::{thread, time::Duration};
-use termion::color;
+use std::{
+    io::{stdout, Write},
+    thread,
+    time::Duration,
+};
+use termion::{color, raw::IntoRawMode};
 
 pub fn stopwatch(time: u64) -> Result<()> {
-    let mut stdout = RawTerm::default();
-    let rx = listen_command();
     let mut counter = Stopwatch::new(Duration::from_secs(time));
 
-    loop {
-        stdout.clear()?;
+    {
+        let mut stdout = stdout().into_raw_mode()?;
+        let rx = listen_command();
 
-        stdout.set_color(color::Magenta)?;
-        stdout.write_line("Stopwatch")?;
-
-        if counter.is_running() {
-            stdout.set_color(color::Green)?;
-        } else {
-            stdout.set_color(color::Red)?;
-        }
-
-        stdout.write_line(fmt_time(counter.counter_at().as_secs()))?;
-
-        stdout.set_color(color::LightYellow)?;
-        stdout.write_line("[Q]: Quit, [Space]: pause/resume")?;
-
-        stdout.flush()?;
-
-        match rx.try_recv() {
-            Ok(Command::Quit) => {
-                break;
+        loop {
+            writeraw! {
+                stdout, clear,
+                %text "Stopwatch", color color::Magenta, (1, 1)%,
+                %text fmt_time(counter.counter_at().as_secs()),
+                    runcolor counter.is_running(), (1, 2)%,
+                %text "[Q]: Quit, [Space]: pause/resume", color color::LightYellow, (1, 3)%
             }
 
-            Ok(Command::Space) | Ok(Command::Enter) => {
-                counter.toggle();
+            stdout.flush()?;
+
+            match rx.try_recv() {
+                Ok(Command::Quit) => break,
+                Ok(Command::Space) | Ok(Command::Enter) => counter.toggle(),
+                _ => (),
             }
 
-            _ => (),
+            thread::sleep(Duration::from_millis(100));
         }
-
-        thread::sleep(Duration::from_millis(100));
     }
 
-    stdout.destroy();
-    println!("+{}", fmt_time(counter.counter_at().as_secs()));
+    println!();
+    // println!("+{}", fmt_time(counter.counter_at().as_secs()));
 
     Ok(())
 }

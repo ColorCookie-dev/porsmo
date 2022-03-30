@@ -1,14 +1,16 @@
-use crate::timer::Timer;
+pub use crate::{counter::*, timer::*};
 use std::time::Duration;
 
-pub type CountType = crate::timer::CountType;
+pub type CountType = crate::timer::CountType<Duration>;
 
+#[derive(Copy, Clone, Debug)]
 pub enum Mode {
     Work,
     Rest,
     LongRest,
 }
 
+#[derive(Debug)]
 pub struct PomoSettings {
     work: Duration,
     rest: Duration,
@@ -36,93 +38,125 @@ impl PomoSettings {
 }
 
 pub struct Pomodoro {
-    counter: Timer,
+    counter: AlertTimer,
     session: u64,
     mode: Mode,
     options: PomoSettings,
+    alert: fn(Mode),
 }
 
 impl Pomodoro {
-    pub fn new(work: Duration, rest: Duration, long_rest: Duration) -> Self {
+    pub fn new(work: Duration, rest: Duration, long_rest: Duration, alert: fn(Mode)) -> Self {
         let options = PomoSettings::new(work, rest, long_rest);
 
         Self {
-            counter: Timer::new(options.work),
+            counter: Timer::new_alert_timer(options.work, move || {
+                alert(Mode::Rest);
+            }),
             session: 0,
             mode: Mode::Work,
             options,
+            alert,
         }
     }
+}
 
-    pub fn mode(&self) -> &Mode {
-        &self.mode
+impl CheckedCount<Duration> for Pomodoro {
+    fn checked_counter_at(&self) -> CountType {
+        self.counter.checked_counter_at()
     }
+}
 
-    pub fn session(&self) -> u64 {
-        self.session
-    }
-
-    pub fn is_running(&self) -> bool {
+impl Pausable for Pomodoro {
+    fn is_running(&self) -> bool {
         self.counter.is_running()
     }
 
-    pub fn is_paused(&self) -> bool {
+    fn is_paused(&self) -> bool {
         self.counter.is_paused()
     }
 
-    pub fn has_ended(&self) -> bool {
-        self.counter.has_ended()
-    }
-
-    pub fn pause(&mut self) {
+    fn pause(&mut self) {
         self.counter.pause();
     }
 
-    pub fn resume(&mut self) {
+    fn resume(&mut self) {
         self.counter.resume();
     }
 
-    pub fn check_next_mode(&self) -> Mode {
+    fn toggle(&mut self) {
+        self.counter.toggle();
+    }
+}
+
+impl Reset for Pomodoro {
+    fn reset(&mut self) {
+        self.counter.reset();
+    }
+}
+
+impl Counter<Duration> for Pomodoro {
+    fn counter_at(&self) -> Duration {
+        self.counter.counter_at()
+    }
+}
+
+impl HasEnd for Pomodoro {
+    fn has_ended(&self) -> bool {
+        self.counter.has_ended()
+    }
+}
+
+pub trait PomoMode {
+    fn mode(&self) -> &Mode;
+    fn session(&self) -> u64;
+    fn check_next_mode(&self) -> Mode;
+    fn next_mode(&mut self);
+}
+
+impl PomoMode for Pomodoro {
+    fn mode(&self) -> &Mode {
+        &self.mode
+    }
+
+    fn session(&self) -> u64 {
+        self.session
+    }
+
+    fn check_next_mode(&self) -> Mode {
         match self.mode {
-            Mode::Work => {
-                if self.session % 4 == 0 && self.session != 0 {
-                    Mode::LongRest
-                } else {
-                    Mode::Rest
-                }
-            }
+            Mode::Work if leap_session(self.session()) => Mode::LongRest,
+            Mode::Work => Mode::Rest,
             Mode::Rest | Mode::LongRest => Mode::Work,
         }
     }
 
-    pub fn next_mode(&mut self) {
-        match self.mode {
+    fn next_mode(&mut self) {
+        let alert = self.alert.clone();
+
+        let target_time = match self.mode {
+            Mode::Work if leap_session(self.session()) => {
+                self.mode = Mode::LongRest;
+                self.options.long_rest
+            }
             Mode::Work => {
-                if self.session % 4 == 0 && self.session != 0 {
-                    self.mode = Mode::LongRest;
-                    self.counter = Timer::new(self.options.long_rest);
-                } else {
-                    self.mode = Mode::Rest;
-                    self.counter = Timer::new(self.options.rest);
-                }
+                self.mode = Mode::Rest;
+                self.options.rest
             }
             Mode::Rest | Mode::LongRest => {
-                self.mode = Mode::Work;
-                self.counter = Timer::new(self.options.work);
                 self.session += 1;
+                self.mode = Mode::Work;
+                self.options.work
             }
-        }
-    }
+        };
 
-    pub fn reset(&mut self) {
-        self.counter.reset();
+        let next = self.check_next_mode();
+        self.counter = Timer::new_alert_timer(target_time, move || {
+            alert(next);
+        })
     }
+}
 
-    pub fn counter_at(&self) -> CountType {
-        self.counter.counter_at()
-    }
-
-    pub fn toggle(&mut self) {
-        self.counter.toggle();
-    }
+fn leap_session(session: u64) -> bool {
+    session % 4 == 0 && session != 0
 }

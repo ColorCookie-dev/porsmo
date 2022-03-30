@@ -1,3 +1,3 @@
-use crate::counter::TimeCount;
+use crate::counter::*;
 
 pub type Stopwatch = TimeCount;
