@@ -1,6 +1,6 @@
 use crate::{
     input::{listen_command, Command},
-    writeraw,
+    program_tick_duration, writeraw,
 };
 use anyhow::Result;
 use porsmo::pomodoro::*;
@@ -13,13 +13,8 @@ use std::{
 };
 use termion::{color, raw::IntoRawMode};
 
-pub fn pomodoro(work: u64, rest: u64, long_rest: u64) -> Result<()> {
-    let mut counter = Pomodoro::new(
-        Duration::from_secs(work),
-        Duration::from_secs(rest),
-        Duration::from_secs(long_rest),
-        alert_pomo,
-    );
+pub fn pomodoro(work: Duration, rest: Duration, long_rest: Duration) -> Result<()> {
+    let mut counter = Pomodoro::new(work, rest, long_rest, alert_pomo);
 
     {
         let mut stdout = stdout().into_raw_mode()?;
@@ -29,12 +24,12 @@ pub fn pomodoro(work: u64, rest: u64, long_rest: u64) -> Result<()> {
             let (title, count, control) = match counter.checked_counter_at() {
                 CountType::Count(count) => (
                     get_pomo_title(*counter.mode()),
-                    fmt_time(count.as_secs()),
+                    fmt_time(count),
                     "[Q]: Quit, [Space]: pause/resume",
                 ),
                 CountType::Exceed(count) => (
                     get_rest_title(*counter.mode()),
-                    format!("+{}", fmt_time(count.as_secs())),
+                    format!("+{}", fmt_time(count)),
                     "[Q]: Quit, [Space]: pause/resume, [Enter]: next session",
                 ),
             };
@@ -63,7 +58,7 @@ pub fn pomodoro(work: u64, rest: u64, long_rest: u64) -> Result<()> {
                 _ => (),
             }
 
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(program_tick_duration!());
         }
     }
 

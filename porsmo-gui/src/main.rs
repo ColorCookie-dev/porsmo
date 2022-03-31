@@ -81,7 +81,7 @@ impl epi::App for Porsmo {
                         ui.visuals_mut().override_text_color = Some(egui::Color32::RED);
                     }
 
-                    ui.heading(format!("{}", fmt_time(c.as_secs())));
+                    ui.heading(format!("{}", fmt_time(c)));
                     ui.visuals_mut().override_text_color = None;
                 }
                 CountType::Exceed(c) => {
@@ -92,7 +92,7 @@ impl epi::App for Porsmo {
                     if self.pomo.is_paused() {
                         ui.visuals_mut().override_text_color = Some(egui::Color32::RED);
                     }
-                    ui.heading(format!("+{}", fmt_time(c.as_secs())));
+                    ui.heading(format!("+{}", fmt_time(c)));
                     ui.visuals_mut().override_text_color = None;
                 }
             };

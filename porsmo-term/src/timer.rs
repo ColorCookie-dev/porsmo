@@ -1,6 +1,6 @@
 use crate::{
     input::{listen_command, Command},
-    writeraw,
+    program_tick_duration, writeraw,
 };
 use anyhow::Result;
 use porsmo::{counter::*, timer::*};
@@ -13,8 +13,8 @@ use std::{
 
 use termion::{color, raw::IntoRawMode};
 
-pub fn timer(time: u64) -> Result<()> {
-    let mut counter = Timer::new(Duration::from_secs(time));
+pub fn timer(time: Duration) -> Result<()> {
+    let mut counter = Timer::new(time);
 
     {
         let mut stdout = stdout().into_raw_mode()?;
@@ -28,14 +28,14 @@ pub fn timer(time: u64) -> Result<()> {
                     writeraw! {
                         stdout,
                         %text "Timer", color color::Magenta, (1, 1)%,
-                        %text fmt_time(c.as_secs()), runcolor counter.is_running(), (1, 2)%,
+                        %text fmt_time(c), runcolor counter.is_running(), (1, 2)%,
                     }
                 }
                 CountType::Exceed(c) => {
                     writeraw! {
                         stdout,
                         %text "Timer ended!", color color::Magenta, (1, 1)%,
-                        %text format_args!("+{}", fmt_time(c.as_secs())),
+                        %text format_args!("+{}", fmt_time(c)),
                             runcolor counter.is_running(), (1, 2)%,
                     }
                 }
@@ -59,7 +59,7 @@ pub fn timer(time: u64) -> Result<()> {
                 alert("Timer ended".into(), "Your timer has ended".into());
             }
 
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(program_tick_duration!());
         }
     }
 

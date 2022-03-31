@@ -1,6 +1,6 @@
 use crate::{
     input::{listen_command, Command},
-    writeraw,
+    program_tick_duration, writeraw,
 };
 use anyhow::Result;
 use porsmo::{counter::*, stopwatch::Stopwatch};
@@ -12,8 +12,8 @@ use std::{
 };
 use termion::{color, raw::IntoRawMode};
 
-pub fn stopwatch(time: u64) -> Result<()> {
-    let mut counter = Stopwatch::new(Duration::from_secs(time));
+pub fn stopwatch(time: Duration) -> Result<()> {
+    let mut counter = Stopwatch::new(time);
 
     {
         let mut stdout = stdout().into_raw_mode()?;
@@ -23,7 +23,7 @@ pub fn stopwatch(time: u64) -> Result<()> {
             writeraw! {
                 stdout, clear,
                 %text "Stopwatch", color color::Magenta, (1, 1)%,
-                %text fmt_time(counter.counter_at().as_secs()),
+                %text fmt_time(counter.counter_at()),
                     runcolor counter.is_running(), (1, 2)%,
                 %text "[Q]: Quit, [Space]: pause/resume", color color::LightYellow, (1, 3)%
             }
@@ -36,7 +36,7 @@ pub fn stopwatch(time: u64) -> Result<()> {
                 _ => (),
             }
 
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(program_tick_duration!());
         }
     }
 
