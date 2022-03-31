@@ -119,6 +119,7 @@ impl Extended<Duration> for Timer {
     }
 }
 
+// ------------ Not in use
 pub type AlertTimer = Arc<Mutex<Timer>>;
 
 impl HasEnd for AlertTimer {

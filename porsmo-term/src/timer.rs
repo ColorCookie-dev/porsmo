@@ -14,12 +14,13 @@ use std::{
 use termion::{color, raw::IntoRawMode};
 
 pub fn timer(time: Duration) -> Result<()> {
-    let mut counter = Timer::new(time);
+    let mut counter = Timer::new_alert_timer(time, move || {
+        alert("Timer ended".into(), "Your timer has ended".into());
+    });
 
     {
         let mut stdout = stdout().into_raw_mode()?;
         let rx = listen_command();
-        let mut alerted = false;
 
         loop {
             writeraw!(stdout, clear);
@@ -51,12 +52,8 @@ pub fn timer(time: Duration) -> Result<()> {
             match rx.try_recv() {
                 Ok(Command::Quit) => break,
                 Ok(Command::Space) | Ok(Command::Enter) => counter.toggle(),
+                Ok(Command::Reset) => counter.reset(),
                 _ => (),
-            }
-
-            if counter.has_ended() && alerted == false {
-                alerted = true;
-                alert("Timer ended".into(), "Your timer has ended".into());
             }
 
             thread::sleep(program_tick_duration!());

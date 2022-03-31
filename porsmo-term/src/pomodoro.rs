@@ -55,6 +55,7 @@ pub fn pomodoro(work: Duration, rest: Duration, long_rest: Duration) -> Result<(
                 }
                 Ok(Command::Enter) if counter.has_ended() => counter.next_mode(),
                 Ok(Command::Enter) | Ok(Command::Space) => counter.toggle(),
+                Ok(Command::Reset) => counter.reset(),
                 _ => (),
             }
 

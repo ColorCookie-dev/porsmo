@@ -87,7 +87,7 @@ macro_rules! program_tick_duration {
 }
 
 fn main() -> Result<()> {
-    log4rs::init_file("logging_config.yaml", Default::default()).unwrap();
+    // log4rs::init_file("logging_config.yaml", Default::default()).unwrap();
 
     let args = Cli::parse();
     match args.mode {

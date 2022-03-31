@@ -10,6 +10,7 @@ pub enum Command {
     Quit,
     Space,
     Enter,
+    Reset,
     Skip,
     Yes,
     No,
@@ -29,6 +30,8 @@ pub fn listen_command() -> Receiver<Command> {
                 Key::Char('S') => tx.try_send(Command::Skip).ok(),
                 Key::Char('y') => tx.try_send(Command::Yes).ok(),
                 Key::Char('n') => tx.try_send(Command::No).ok(),
+
+                Key::Ctrl('r') => tx.try_send(Command::Reset).ok(),
 
                 Key::Char('\n') => tx.try_send(Command::Enter).ok(),
                 Key::Char(' ') => tx.try_send(Command::Space).ok(),

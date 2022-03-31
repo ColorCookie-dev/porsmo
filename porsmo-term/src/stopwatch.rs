@@ -33,6 +33,7 @@ pub fn stopwatch(time: Duration) -> Result<()> {
             match rx.try_recv() {
                 Ok(Command::Quit) => break,
                 Ok(Command::Space) | Ok(Command::Enter) => counter.toggle(),
+                Ok(Command::Reset) => counter.reset(),
                 _ => (),
             }
 
