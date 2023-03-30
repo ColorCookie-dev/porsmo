@@ -11,7 +11,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[clap(
     name = "Porsmo",
-    author = "HellsNoah <hellsnoah@protonmail.com",
+    author = "HellsNoah <hellsnoah@protonmail.com>",
     version = "0.1.3",
     about = "Timer and Stopwatch and Pomodoro",
     long_about = None,
