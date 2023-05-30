@@ -5,18 +5,18 @@ use std::{
 };
 use termion::{event::Key, input::TermRead};
 
-#[derive(Debug)]
 pub enum Command {
     Quit,
-    Space,
+    Pause,
+    Resume,
+    Toggle,
     Enter,
-    Reset,
     Skip,
     Yes,
     No,
 }
 
-pub fn listen_command() -> Receiver<Command> {
+pub fn listen_for_inputs() -> Receiver<Command> {
     let (tx, rx) = mpsc::sync_channel::<Command>(3);
 
     thread::spawn(move || {
@@ -31,10 +31,12 @@ pub fn listen_command() -> Receiver<Command> {
                 Key::Char('y') => tx.try_send(Command::Yes).ok(),
                 Key::Char('n') => tx.try_send(Command::No).ok(),
 
-                Key::Ctrl('r') => tx.try_send(Command::Reset).ok(),
-
                 Key::Char('\n') => tx.try_send(Command::Enter).ok(),
-                Key::Char(' ') => tx.try_send(Command::Space).ok(),
+                Key::Char('t') => tx.try_send(Command::Toggle).ok(),
+                Key::Char(' ') => tx.try_send(Command::Toggle).ok(),
+
+                Key::Char('p') => tx.try_send(Command::Pause).ok(),
+                Key::Char('c') => tx.try_send(Command::Resume).ok(),
 
                 _ => None,
             };

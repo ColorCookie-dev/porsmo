@@ -1,8 +1,24 @@
-[workspace]
+[package]
+name = "porsmo"
+version = "0.1.3"
+edition = "2021"
+readme = "README.md"
+license = "MIT"
+description = "A pomodoro, timer and stopwatch, all in one app"
+homepage = "https://github.com/ColorCookie-dev/porsmo"
+repository = "https://github.com/ColorCookie-dev/porsmo"
+keywords = ["cli", "pomodoro", "timer", "countdown"]
+categories = ["command-line-utilities"]
 
-members = [
-    "porsmo",
-    "porsmo-term",
-    "porsmo-gui",
-    "porsmo_helpers",
-]
+[[bin]]
+name = "porsmo"
+path = "src/porsmo/main.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "3.0", features = ["derive"] }
+anyhow = "1.0"
+termion = "1.5.5"
+notify-rust = "4"
+rodio = "0.12.0"
