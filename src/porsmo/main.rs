@@ -13,8 +13,8 @@ use crate::{pomodoro::pomodoro, stopwatch::stopwatch, timer::timer};
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 
-#[derive(Parser)]
-#[clap(
+#[derive(Parser, Debug)]
+#[command(
     name = "Porsmo",
     author = "HellsNoah <hellsnoah@protonmail.com>",
     version = "0.1.3",
@@ -22,53 +22,53 @@ use clap::{Parser, Subcommand};
     long_about = None,
 )]
 struct Cli {
-    #[clap(subcommand, name = "mode")]
+    #[command(subcommand, name = "mode")]
     mode: Option<Modes>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 enum Modes {
-    /// stopwatch, counts up until you tell it to stop
-    #[clap(name = "stopwatch", alias = "s")]
+    /// alias: s, stopwatch, counts up until you tell it to stop
+    #[command(name = "stopwatch", alias = "s")]
     Stopwatch {
-        #[clap(parse(try_from_str=parse_time),
+        #[arg(value_parser = parse_time,
                default_value_t = 0,
                value_name = "time")]
         /// Lets you start timer from a particular time
-        time: u64,
+        start_time: u64,
     },
-    /// timer, counts down until you tell it to stop, or it ends
-    #[clap(name = "timer", alias = "t")]
+    /// alias: t, timer, counts down until you tell it to stop, or it ends
+    #[command(name = "timer", alias = "t")]
     Timer {
-        #[clap(parse(try_from_str=parse_time),
+        #[arg(value_parser = parse_time,
                default_value_t = 25*60,
                value_name = "time")]
-        time: u64,
+        start_time: u64,
     },
-    /// pomodoro, for all you productivity needs (default)
-    #[clap(name = "pomodoro", alias = "p")]
+    /// alias: p, pomodoro, for all you productivity needs (default)
+    #[command(name = "pomodoro", alias = "p")]
     Pomodoro {
         #[clap(subcommand, name = "mode")]
         mode: Option<PomoMode>,
     },
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 enum PomoMode {
-    /// short pomodoro, with 25, 5, 10 min values (default)
-    #[clap(name = "short", alias = "-s")]
+    /// alias: s, short pomodoro, with 25, 5, 10 min values (default)
+    #[command(name = "short", alias = "s")]
     Short,
-    /// long pomodoro, with 55, 10, 20 min values
-    #[clap(name = "long", alias = "-l")]
+    /// alias: l, long pomodoro, with 55, 10, 20 min values
+    #[command(name = "long", alias = "l")]
     Long,
-    /// custom pomodoro, with any specified values
-    #[clap(name = "custom", alias = "-c")]
+    /// alias: c, custom pomodoro, with any specified values
+    #[command(name = "custom", alias = "c")]
     Custom {
-        #[clap(parse(try_from_str=parse_time), value_name = "work time")]
+        #[arg(value_parser = parse_time, value_name = "work-time")]
         work_time: u64,
-        #[clap(parse(try_from_str=parse_time), value_name = "break time")]
+        #[arg(value_parser = parse_time, value_name = "break-time")]
         break_time: u64,
-        #[clap(parse(try_from_str=parse_time), value_name = "long break time")]
+        #[arg(value_parser = parse_time, value_name = "long-break-time")]
         long_break_time: u64,
     },
 }
@@ -76,8 +76,8 @@ enum PomoMode {
 fn main() -> Result<()> {
     let args = Cli::parse();
     match args.mode {
-        Some(Modes::Stopwatch { time }) => stopwatch(time),
-        Some(Modes::Timer { time }) => timer(time),
+        Some(Modes::Stopwatch { start_time: time }) => stopwatch(time),
+        Some(Modes::Timer { start_time: time }) => timer(time),
         Some(Modes::Pomodoro { mode }) => match mode {
             Some(PomoMode::Short) | None => pomodoro(25 * 60, 5 * 60, 10 * 60),
             Some(PomoMode::Long) => pomodoro(55 * 60, 10 * 60, 20 * 60),
