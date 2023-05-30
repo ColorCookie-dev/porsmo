@@ -2,21 +2,20 @@ use crate::{
     alert::alert,
     format::fmt_time,
     input::{listen_for_inputs, Command},
-    terminal::{clear, show_prompt},
-    terminal::{show_counter, TermRawMode},
+    terminal::TerminalHandler,
 };
 use anyhow::Result;
+use crossterm::style::Color;
 use porsmo::{
     counter::Counter,
     pomodoro::{Mode, Pomodoro},
     stopwatch::Stopwatch,
 };
-use std::{fmt::Display, io::Write, sync::mpsc::Receiver, thread, time::Duration};
-use termion::color;
+use std::{fmt::Display, sync::mpsc::Receiver, thread, time::Duration};
 
 pub fn pomodoro(work_time: u64, break_time: u64, long_break_time: u64) -> Result<u64> {
     let mut pomo = Pomodoro::new(work_time, break_time, long_break_time);
-    let stdout = &mut TermRawMode::new().stdout;
+    let mut terminal = TerminalHandler::new()?;
     let rx = listen_for_inputs();
 
     loop {
@@ -39,7 +38,7 @@ pub fn pomodoro(work_time: u64, break_time: u64, long_break_time: u64) -> Result
 
             Ok(Command::Skip) => {
                 pomo.pause();
-                if skip_prompt(stdout, &rx, pomo.check_next_mode(), pomo.session())? {
+                if skip_prompt(&mut terminal, &rx, pomo.check_next_mode(), pomo.session())? {
                     pomo.next_mode()
                 } else {
                     pomo.resume();
@@ -52,7 +51,7 @@ pub fn pomodoro(work_time: u64, break_time: u64, long_break_time: u64) -> Result
         if pomo.has_ended() {
             alert_pomo(pomo.check_next_mode());
             let (counter, next) =
-                start_excess_counting(stdout, &rx, pomo.check_next_mode(), pomo.session())?;
+                start_excess_counting(&mut terminal, &rx, pomo.check_next_mode(), pomo.session())?;
             if next {
                 pomo.next_mode();
             } else {
@@ -66,8 +65,7 @@ pub fn pomodoro(work_time: u64, break_time: u64, long_break_time: u64) -> Result
             Mode::LongBreak => "Pomodor (Long Break)",
         };
 
-        show_counter(
-            stdout,
+        terminal.show_counter(
             title,
             fmt_time(pomo.counter()),
             pomo.is_running(),
@@ -82,7 +80,7 @@ pub fn pomodoro(work_time: u64, break_time: u64, long_break_time: u64) -> Result
 }
 
 fn skip_prompt(
-    stdout: &mut impl Write,
+    terminal: &mut TerminalHandler,
     rx: &Receiver<Command>,
     next_mode: Mode,
     session: u64,
@@ -100,14 +98,14 @@ fn skip_prompt(
             _ => (),
         }
 
-        show_prompt_pomo(stdout, next_mode, format!("Round: {}", session))?;
+        show_prompt_pomo(terminal, next_mode, format!("Round: {}", session))?;
 
         thread::sleep(Duration::from_millis(100));
     }
 }
 
 fn start_excess_counting(
-    stdout: &mut impl Write,
+    terminal: &mut TerminalHandler,
     rx: &Receiver<Command>,
     next_mode: Mode,
     session: u64,
@@ -144,8 +142,7 @@ fn start_excess_counting(
             Mode::LongBreak => "Work has ended! Start a long break",
         };
 
-        show_counter(
-            stdout,
+        terminal.show_counter(
             title,
             format!("+{}", fmt_time(st.counter())),
             st.is_running(),
@@ -170,14 +167,14 @@ pub fn alert_pomo(next_mode: Mode) {
 }
 
 pub fn show_prompt_pomo(
-    stdout: &mut impl Write,
+    terminal: &mut TerminalHandler,
     next_mode: Mode,
     message: impl Display,
 ) -> Result<()> {
-    clear(stdout)?;
+    terminal.clear()?;
     match next_mode {
-        Mode::Work => show_prompt(stdout, "skip to work?", color::Red, message),
-        Mode::Break => show_prompt(stdout, "skip to break?", color::Green, message),
-        Mode::LongBreak => show_prompt(stdout, "skip to long break?", color::Green, message),
+        Mode::Work => terminal.show_prompt("skip to work?", Color::Red, message),
+        Mode::Break => terminal.show_prompt("skip to break?", Color::Green, message),
+        Mode::LongBreak => terminal.show_prompt("skip to long break?", Color::Green, message),
     }
 }

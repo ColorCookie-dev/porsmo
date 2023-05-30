@@ -3,15 +3,15 @@ use crate::{
     format::fmt_time,
     input::{listen_for_inputs, Command},
     stopwatch::default_stopwatch_loop,
-    terminal::{show_counter, TermRawMode},
+    terminal::TerminalHandler,
 };
 use anyhow::Result;
 use porsmo::{counter::Counter, timer::Timer};
-use std::{io::Write, sync::mpsc::Receiver, thread, time::Duration};
+use std::{sync::mpsc::Receiver, thread, time::Duration};
 
 pub fn timer(time: u64) -> Result<u64> {
     let mut c = Timer::new(time);
-    let mut stdout = &mut TermRawMode::new().stdout;
+    let mut terminal = &mut TerminalHandler::new()?;
     let rx = listen_for_inputs();
     let counter_ended_at;
 
@@ -41,12 +41,11 @@ pub fn timer(time: u64) -> Result<u64> {
         if c.has_ended() {
             c.end_count();
             alert("Timer ended!".into(), "You Porsmo timer has ended".into());
-            counter_ended_at = start_excess_counting(stdout, &rx)?;
+            counter_ended_at = start_excess_counting(&mut terminal, &rx)?;
             break;
         }
 
-        show_counter(
-            &mut stdout,
+        terminal.show_counter(
             "Timer",
             fmt_time(c.counter()),
             c.is_running(),
@@ -60,10 +59,10 @@ pub fn timer(time: u64) -> Result<u64> {
     Ok(counter_ended_at)
 }
 
-fn start_excess_counting(stdout: &mut impl Write, rx: &Receiver<Command>) -> Result<u64> {
-    default_stopwatch_loop(stdout, rx, 0, move |stdout, st| {
-        show_counter(
-            stdout,
+fn start_excess_counting(terminal: &mut TerminalHandler, rx: &Receiver<Command>)
+    -> Result<u64> {
+    default_stopwatch_loop(rx, 0, move |st| {
+        terminal.show_counter(
             "Timer has ended",
             format!("+{}", fmt_time(st.counter())),
             st.is_running(),

@@ -1,84 +1,128 @@
 use anyhow::{Context, Result};
 use std::{
     fmt::Display,
-    io::{stdout, Stdout, Write},
+    io::{stdout, Write, Stdout},
 };
-use termion::raw::{IntoRawMode, RawTerminal};
-use termion::{clear, color, cursor};
+use crossterm::{
+    terminal::{
+        enable_raw_mode,
+        disable_raw_mode,
+        EnterAlternateScreen,
+        LeaveAlternateScreen,
+    },
+    cursor,
+    execute,
+    terminal,
+    style::{SetForegroundColor, Color, Print},
+    event::{DisableMouseCapture, EnableMouseCapture},
+};
 
-pub struct TermRawMode {
-    pub stdout: RawTerminal<Stdout>,
-}
+pub struct TerminalHandler(pub Stdout);
 
-impl TermRawMode {
-    pub fn new() -> TermRawMode {
-        TermRawMode {
-            stdout: stdout().into_raw_mode().unwrap(),
+impl TerminalHandler {
+    pub fn new() -> anyhow::Result<Self> {
+        enable_raw_mode().with_context(|| "Unable to enter raw mode")?;
+        let mut stdout = std::io::stdout();
+        execute!(
+            &mut stdout,
+            EnterAlternateScreen,
+            EnableMouseCapture,
+            terminal::Clear(terminal::ClearType::All),
+        ).with_context(|| "Unable to write to terminal")?;
+
+        Ok(Self(stdout))
+    }
+
+    pub fn show_time(
+        &mut self,
+        time: impl Display,
+        running: bool,
+        pos: Pos,
+    ) -> Result<()> {
+        if running {
+            self.show_text(time, Color::Green, pos)?;
+        } else {
+            self.show_text(time, Color::Red, pos)?;
         }
+        Ok(())
     }
+
+    pub fn show_counter(
+        &mut self,
+        title: impl Display,
+        time: impl Display,
+        running: bool,
+        controls: impl Display,
+        message: impl Display,
+    ) -> Result<()> {
+        self.clear()?;
+        self.show_text(title, Color::Magenta, (1, 1).into())?;
+        self.show_time(time, running, (1, 2).into())?;
+        self.show_text(controls, Color::Magenta, (1, 3).into())?;
+        self.show_text(message, Color::Yellow, (1, 4).into())?;
+
+        Ok(())
+    }
+
+    pub fn show_text(
+        &mut self,
+        text: impl Display,
+        color: Color,
+        pos: Pos,
+    ) -> Result<()> {
+        let stdout = &mut self.0;
+        execute!(
+            stdout,
+            cursor::MoveTo(pos.right, pos.down),
+            SetForegroundColor(color),
+            Print(text),
+        )
+        .with_context(|| "failed to display timer")?;
+        stdout.flush().with_context(|| "failed to flush stdout")
+    }
+
+    pub fn clear(&mut self) -> Result<()> {
+        let stdout = &mut self.0;
+        execute!(
+            stdout,
+            cursor::MoveTo(1, 1),
+            terminal::Clear(terminal::ClearType::All),
+        )
+        .with_context(|| "failed to clear the terminal")?;
+
+        stdout.flush().with_context(|| "failed to flush stdout")
+    }
+
+    pub fn show_prompt(
+        &mut self,
+        prompt: impl Display,
+        prompt_color: Color,
+        message: impl Display,
+    ) -> Result<()> {
+        self.clear()?;
+        self.show_text(prompt, prompt_color, (1, 1).into())?;
+        self.show_text(
+            "[Enter]: Yes, [Q/N]: No",
+            Color::Magenta,
+            (1, 2).into(),
+        )?;
+        self.show_text(message, Color::Yellow, (1, 3).into())?;
+
+        Ok(())
+    }
+
 }
 
-impl Drop for TermRawMode {
+impl Drop for TerminalHandler {
     fn drop(&mut self) {
-        reset_terminal(&mut self.stdout).unwrap();
+        disable_raw_mode().expect("Failed to disable raw mode");
+        execute!(
+            stdout(),
+            terminal::Clear(terminal::ClearType::All),
+            DisableMouseCapture,
+            LeaveAlternateScreen,
+        ).expect("Failed to reset screen");
     }
-}
-
-pub fn reset_terminal(stdout: &mut impl Write) -> Result<()> {
-    write!(
-        stdout,
-        "{top}{clear}{show}{color}",
-        top = cursor::Goto(1, 1),
-        clear = clear::All,
-        color = color::Fg(color::Reset),
-        show = termion::cursor::Show
-    )
-    .with_context(|| "failed to release raw mode")?;
-
-    stdout.flush().with_context(|| "failed to flush stdout")
-}
-
-pub fn clear(stdout: &mut impl Write) -> Result<()> {
-    write!(
-        stdout,
-        "{top}{clear}",
-        top = cursor::Goto(1, 1),
-        clear = clear::All,
-    )
-    .with_context(|| "failed to clear the terminal")?;
-
-    stdout.flush().with_context(|| "failed to flush stdout")
-}
-
-pub fn show_time(
-    stdout: &mut impl Write,
-    time: impl Display,
-    running: bool,
-    pos: Pos,
-) -> Result<()> {
-    if running {
-        show_text(stdout, time, color::Green, pos)?;
-    } else {
-        show_text(stdout, time, color::Red, pos)?;
-    }
-    Ok(())
-}
-
-pub fn show_counter(
-    stdout: &mut impl Write,
-    title: impl Display,
-    time: impl Display,
-    running: bool,
-    controls: impl Display,
-    message: impl Display,
-) -> Result<()> {
-    clear(stdout)?;
-    show_text(stdout, title, color::Magenta, (1, 1).into())?;
-    show_time(stdout, time, running, (1, 2).into())?;
-    show_text(stdout, controls, color::Magenta, (1, 3).into())?;
-    show_text(stdout, message, color::LightYellow, (1, 4).into())?;
-
-    Ok(())
 }
 
 pub struct Pos {
@@ -93,87 +137,3 @@ impl From<(u16, u16)> for Pos {
     }
 }
 
-pub fn show_text(
-    stdout: &mut impl Write,
-    text: impl Display,
-    color: impl color::Color,
-    pos: Pos,
-) -> Result<()> {
-    write!(
-        stdout,
-        "{cursor}{color}{text}",
-        color = color::Fg(color),
-        cursor = cursor::Goto(pos.right, pos.down),
-        text = text,
-    )
-    .with_context(|| "failed to display timer")?;
-
-    stdout.flush().with_context(|| "failed to flush stdout")
-}
-
-pub fn show_prompt(
-    stdout: &mut impl Write,
-    prompt: impl Display,
-    prompt_color: impl color::Color,
-    message: impl Display,
-) -> Result<()> {
-    clear(stdout)?;
-    show_text(stdout, prompt, prompt_color, (1, 1).into())?;
-    show_text(
-        stdout,
-        "[Enter]: Yes, [Q/N]: No",
-        color::Magenta,
-        (1, 2).into(),
-    )?;
-    show_text(stdout, message, color::LightYellow, (1, 3).into())?;
-
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::terminal::*;
-
-    #[test]
-    fn test_show_message() {
-        let mut buf = Vec::<u8>::new();
-        let msg = "Hello World";
-
-        let res = show_message(&mut buf, msg, 0);
-        assert!(res.is_ok());
-        assert!(String::from_utf8(buf.to_vec()).unwrap().contains(msg));
-
-        buf.clear();
-        let res = show_message_red(&mut buf, msg, 0);
-        assert!(res.is_ok());
-        assert!(String::from_utf8(buf.to_vec()).unwrap().contains(msg));
-
-        buf.clear();
-        let res = show_message_green(&mut buf, msg, 0);
-        assert!(res.is_ok());
-        assert!(String::from_utf8(buf.to_vec()).unwrap().contains(msg));
-
-        buf.clear();
-        let res = show_message_yellow(&mut buf, msg, 0);
-        assert!(res.is_ok());
-        assert!(String::from_utf8(buf.to_vec()).unwrap().contains(msg));
-    }
-
-    #[test]
-    fn test_show_time() {
-        let mut buf = Vec::<u8>::new();
-        let res = show_time_running(&mut buf, 300);
-
-        let new_buf = String::from_utf8(buf.to_vec()).unwrap();
-        assert!(res.is_ok());
-        assert!(new_buf.contains("05:00"));
-
-        buf.clear();
-
-        let res = show_time_paused(&mut buf, 300);
-
-        let new_buf = String::from_utf8(buf.to_vec()).unwrap();
-        assert!(res.is_ok());
-        assert!(new_buf.contains("05:00"));
-    }
-}

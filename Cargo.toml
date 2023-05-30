@@ -19,6 +19,7 @@ path = "src/porsmo/main.rs"
 [dependencies]
 clap = { version = "3.0", features = ["derive"] }
 anyhow = "1.0"
-termion = "1.5.5"
 notify-rust = "4"
 rodio = "0.12.0"
+crossterm = "0.26.1"
+termion = "2.0.1"

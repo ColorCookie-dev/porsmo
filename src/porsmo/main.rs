@@ -16,7 +16,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[clap(
     name = "Porsmo",
-    author = "HellsNoah <hellsnoah@protonmail.com",
+    author = "HellsNoah <hellsnoah@protonmail.com>",
     version = "0.1.3",
     about = "Timer and Stopwatch and Pomodoro",
     long_about = None,
@@ -64,14 +64,11 @@ enum PomoMode {
     /// custom pomodoro, with any specified values
     #[clap(name = "custom", alias = "-c")]
     Custom {
-        #[clap(parse(try_from_str=parse_time),
-               value_name = "work time")]
+        #[clap(parse(try_from_str=parse_time), value_name = "work time")]
         work_time: u64,
-        #[clap(parse(try_from_str=parse_time),
-               value_name = "break time")]
+        #[clap(parse(try_from_str=parse_time), value_name = "break time")]
         break_time: u64,
-        #[clap(parse(try_from_str=parse_time),
-               value_name = "long break time")]
+        #[clap(parse(try_from_str=parse_time), value_name = "long break time")]
         long_break_time: u64,
     },
 }
@@ -80,14 +77,10 @@ fn main() -> Result<()> {
     let args = Cli::parse();
     match args.mode {
         Some(Modes::Stopwatch { time }) => stopwatch(time),
-
         Some(Modes::Timer { time }) => timer(time),
-
         Some(Modes::Pomodoro { mode }) => match mode {
             Some(PomoMode::Short) | None => pomodoro(25 * 60, 5 * 60, 10 * 60),
-
             Some(PomoMode::Long) => pomodoro(55 * 60, 10 * 60, 20 * 60),
-
             Some(PomoMode::Custom {
                 work_time,
                 break_time,
