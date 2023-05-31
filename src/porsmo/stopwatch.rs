@@ -11,8 +11,8 @@ pub fn default_stopwatch_loop(
     rx: &Receiver<Command>,
     time: u64,
     mut update: impl FnMut(&Stopwatch) -> Result<()>,
-) -> Result<u64> {
-    let mut st = Stopwatch::new(time);
+) -> Result<Duration> {
+    let mut st = Stopwatch::new(Duration::from_secs(time));
 
     loop {
         match rx.try_recv() {
@@ -41,17 +41,17 @@ pub fn default_stopwatch_loop(
         thread::sleep(Duration::from_millis(100));
     }
 
-    Ok(st.counter())
+    Ok(st.elapsed())
 }
 
-pub fn stopwatch(time: u64) -> Result<u64> {
+pub fn stopwatch(time: u64) -> Result<Duration> {
     let mut terminal = TerminalHandler::new()?;
     let rx = listen_for_inputs();
 
     default_stopwatch_loop(&rx, time, move |st| {
         terminal.show_counter(
             "StopWatch",
-            fmt_time(st.counter()),
+            fmt_time(st.elapsed()),
             st.is_running(),
             "[Q]: quit, [Space]: pause/resume",
             "",

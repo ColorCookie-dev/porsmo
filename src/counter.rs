@@ -1,11 +1,11 @@
+use std::time::Duration;
+
 pub trait Counter {
     fn is_running(&self) -> bool;
 
-    fn is_paused(&self) -> bool;
-
     fn has_ended(&self) -> bool;
 
-    fn counter(&self) -> u64;
+    fn elapsed(&self) -> Duration;
 
     fn pause(&mut self);
 
@@ -13,11 +13,5 @@ pub trait Counter {
 
     fn end_count(&mut self);
 
-    fn toggle(&mut self) {
-        if self.is_running() {
-            self.pause();
-        } else if self.is_paused() {
-            self.resume();
-        }
-    }
+    fn toggle(&mut self);
 }

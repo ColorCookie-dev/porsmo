@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::{counter::Counter, timer::Timer};
 
 pub struct Pomodoro {
@@ -5,9 +7,9 @@ pub struct Pomodoro {
     mode: Mode,
     session: u64,
 
-    work_time: u64,
-    break_time: u64,
-    long_break_time: u64,
+    work_time: Duration,
+    break_time: Duration,
+    long_break_time: Duration,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -18,7 +20,11 @@ pub enum Mode {
 }
 
 impl Pomodoro {
-    pub fn new(work_time: u64, break_time: u64, long_break_time: u64) -> Self {
+    pub fn new(
+        work_time: Duration,
+        break_time: Duration,
+        long_break_time: Duration
+        ) -> Self {
         Self {
             timer: Timer::new(work_time),
             mode: Mode::Work,
@@ -85,12 +91,8 @@ impl Counter for Pomodoro {
         self.timer.is_running()
     }
 
-    fn is_paused(&self) -> bool {
-        self.timer.is_paused()
-    }
-
-    fn counter(&self) -> u64 {
-        self.timer.counter()
+    fn elapsed(&self) -> Duration {
+        self.timer.elapsed()
     }
 
     fn pause(&mut self) {
@@ -103,5 +105,13 @@ impl Counter for Pomodoro {
 
     fn end_count(&mut self) {
         self.timer.pause();
+    }
+
+    fn toggle(&mut self) {
+        if self.is_running() {
+            self.timer.pause();
+        } else {
+            self.timer.resume();
+        }
     }
 }

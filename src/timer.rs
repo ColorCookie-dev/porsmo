@@ -1,72 +1,60 @@
 use crate::counter::Counter;
-use std::time::Instant;
+use std::time::{Instant, Duration};
 
 pub struct Timer {
-    started: Instant,
-    counter: u64,
-    status: Status,
-}
-
-enum Status {
-    Running,
-    Paused,
+    started: Option<Instant>,
+    remaining: Duration,
 }
 
 impl Timer {
-    pub fn new(count: u64) -> Self {
+    pub fn new(remaining: Duration) -> Self {
         Self {
-            started: Instant::now(),
-            counter: count,
-            status: Status::Running,
-        }
-    }
-
-    fn counter_now(&self) -> u64 {
-        let elapsed = self.started.elapsed().as_secs();
-        if self.counter > elapsed {
-            self.counter - elapsed
-        } else {
-            0
+            started: Some(Instant::now()),
+            remaining,
         }
     }
 }
 
 impl Counter for Timer {
     fn has_ended(&self) -> bool {
-        self.counter() == 0
+        self.elapsed().is_zero()
     }
 
     fn is_running(&self) -> bool {
-        matches!(self.status, Status::Running)
+        !matches!(self.started, None)
     }
 
-    fn is_paused(&self) -> bool {
-        matches!(self.status, Status::Paused)
-    }
-
-    fn counter(&self) -> u64 {
-        if self.is_running() {
-            self.counter_now()
-        } else {
-            self.counter
+    fn elapsed(&self) -> Duration {
+        match self.started {
+            Some(started) => self.remaining.saturating_sub(started.elapsed()),
+            None => self.remaining,
         }
     }
 
     fn pause(&mut self) {
         if self.is_running() {
-            self.counter = self.counter_now();
-            self.status = Status::Paused;
+            self.remaining = self.elapsed();
+            self.started = None;
         }
     }
 
     fn resume(&mut self) {
-        if self.is_paused() {
-            self.status = Status::Running;
-            self.started = Instant::now();
+        if !self.is_running() {
+            self.started = Some(Instant::now());
         }
     }
 
     fn end_count(&mut self) {
         self.pause();
+    }
+
+    fn toggle(&mut self) {
+        match self.started {
+            Some(started) => {
+                self.remaining = self.remaining.saturating_sub(started.elapsed());
+                self.started = None;
+            },
+            None => self.started = Some(Instant::now()),
+        }
     }
 }

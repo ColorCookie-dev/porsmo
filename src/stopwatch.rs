@@ -1,65 +1,63 @@
 use crate::counter::Counter;
-use std::time::Instant;
+use std::time::{Instant, Duration};
 
 pub struct Stopwatch {
-    started: Instant,
-    counter: u64,
-    status: Status,
-}
-
-enum Status {
-    Running,
-    Paused,
-    Ended,
+    started: Option<Instant>,
+    elapsed: Duration,
+    ended: bool,
 }
 
 impl Stopwatch {
-    pub fn new(count: u64) -> Self {
+    pub fn new(elapsed: Duration) -> Self {
         Self {
-            started: Instant::now(),
-            counter: count,
-            status: Status::Running,
+            started: Some(Instant::now()),
+            elapsed,
+            ended: true,
         }
     }
 }
 
 impl Counter for Stopwatch {
     fn has_ended(&self) -> bool {
-        matches!(self.status, Status::Ended)
+        self.ended
     }
 
     fn is_running(&self) -> bool {
-        matches!(self.status, Status::Running)
+        !matches!(self.started, None)
     }
 
-    fn is_paused(&self) -> bool {
-        matches!(self.status, Status::Paused)
-    }
-
-    fn counter(&self) -> u64 {
-        if self.is_running() {
-            self.counter + self.started.elapsed().as_secs()
-        } else {
-            self.counter
+    fn elapsed(&self) -> Duration {
+        match self.started {
+            Some(started) => started.elapsed().saturating_add(self.elapsed),
+            None => self.elapsed,
         }
     }
 
     fn pause(&mut self) {
         if self.is_running() {
-            self.counter += self.started.elapsed().as_secs();
-            self.status = Status::Paused;
+            self.elapsed = self.elapsed();
+            self.started = None;
         }
     }
 
     fn resume(&mut self) {
-        if self.is_paused() {
-            self.status = Status::Running;
-            self.started = Instant::now();
+        if !self.is_running() && !self.ended {
+            self.started = Some(Instant::now());
         }
     }
 
     fn end_count(&mut self) {
         self.pause();
-        self.status = Status::Ended;
+        self.ended = true;
+    }
+
+    fn toggle(&mut self) {
+        match self.started {
+            Some(started) => {
+                self.elapsed = started.elapsed().saturating_add(self.elapsed);
+                self.started = None;
+            },
+            None => self.started = Some(Instant::now()),
+        }
     }
 }

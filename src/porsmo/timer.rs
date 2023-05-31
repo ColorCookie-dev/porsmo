@@ -9,8 +9,8 @@ use anyhow::Result;
 use porsmo::{counter::Counter, timer::Timer};
 use std::{sync::mpsc::Receiver, thread, time::Duration};
 
-pub fn timer(time: u64) -> Result<u64> {
-    let mut c = Timer::new(time);
+pub fn timer(time: u64) -> Result<Duration> {
+    let mut c = Timer::new(Duration::from_secs(time));
     let mut terminal = &mut TerminalHandler::new()?;
     let rx = listen_for_inputs();
     let counter_ended_at;
@@ -19,7 +19,7 @@ pub fn timer(time: u64) -> Result<u64> {
         match rx.try_recv() {
             Ok(Command::Quit) => {
                 c.end_count();
-                counter_ended_at = c.counter();
+                counter_ended_at = c.elapsed();
                 break;
             }
 
@@ -47,7 +47,7 @@ pub fn timer(time: u64) -> Result<u64> {
 
         terminal.show_counter(
             "Timer",
-            fmt_time(c.counter()),
+            fmt_time(c.elapsed()),
             c.is_running(),
             "[Q]: quit, [Space]: pause/resume",
             "",
@@ -60,11 +60,11 @@ pub fn timer(time: u64) -> Result<u64> {
 }
 
 fn start_excess_counting(terminal: &mut TerminalHandler, rx: &Receiver<Command>)
-    -> Result<u64> {
+    -> Result<Duration> {
     default_stopwatch_loop(rx, 0, move |st| {
         terminal.show_counter(
             "Timer has ended",
-            format!("+{}", fmt_time(st.counter())),
+            format!("+{}", fmt_time(st.elapsed())),
             st.is_running(),
             "[Q]: quit, [Space]: pause/resume",
             "",

@@ -13,7 +13,11 @@ use porsmo::{
 };
 use std::{fmt::Display, sync::mpsc::Receiver, thread, time::Duration};
 
-pub fn pomodoro(work_time: u64, break_time: u64, long_break_time: u64) -> Result<u64> {
+pub fn pomodoro(
+    work_time: Duration,
+    break_time: Duration,
+    long_break_time: Duration
+    ) -> Result<Duration> {
     let mut pomo = Pomodoro::new(work_time, break_time, long_break_time);
     let mut terminal = TerminalHandler::new()?;
     let rx = listen_for_inputs();
@@ -67,7 +71,7 @@ pub fn pomodoro(work_time: u64, break_time: u64, long_break_time: u64) -> Result
 
         terminal.show_counter(
             title,
-            fmt_time(pomo.counter()),
+            fmt_time(pomo.elapsed()),
             pomo.is_running(),
             "[Q]: quit, [Space]: pause/resume.",
             format!("Round: {}", pomo.session()),
@@ -76,7 +80,7 @@ pub fn pomodoro(work_time: u64, break_time: u64, long_break_time: u64) -> Result
         thread::sleep(Duration::from_millis(100));
     }
 
-    Ok(pomo.counter())
+    Ok(pomo.elapsed())
 }
 
 fn skip_prompt(
@@ -109,8 +113,8 @@ fn start_excess_counting(
     rx: &Receiver<Command>,
     next_mode: Mode,
     session: u64,
-) -> Result<(u64, bool)> {
-    let mut st = Stopwatch::new(0);
+) -> Result<(Duration, bool)> {
+    let mut st = Stopwatch::new(Duration::ZERO);
 
     loop {
         match rx.try_recv() {
@@ -131,7 +135,7 @@ fn start_excess_counting(
                 st.toggle();
             }
 
-            Ok(Command::Enter) => return Ok((st.counter(), true)),
+            Ok(Command::Enter) => return Ok((st.elapsed(), true)),
 
             _ => (),
         }
@@ -144,7 +148,7 @@ fn start_excess_counting(
 
         terminal.show_counter(
             title,
-            format!("+{}", fmt_time(st.counter())),
+            format!("+{}", fmt_time(st.elapsed())),
             st.is_running(),
             "[Q]: Quit, [Enter]: Start, [Space]: toggle",
             format!("Round: {}", session),
@@ -153,7 +157,7 @@ fn start_excess_counting(
         thread::sleep(Duration::from_millis(100));
     }
 
-    Ok((st.counter(), false))
+    Ok((st.elapsed(), false))
 }
 
 pub fn alert_pomo(next_mode: Mode) {

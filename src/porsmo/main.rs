@@ -8,6 +8,8 @@ mod stopwatch;
 mod terminal;
 mod timer;
 
+use std::time::Duration;
+
 use crate::format::fmt_time;
 use crate::{pomodoro::pomodoro, stopwatch::stopwatch, timer::timer};
 use anyhow::{bail, Result};
@@ -79,19 +81,35 @@ fn main() -> Result<()> {
         Some(Modes::Stopwatch { start_time: time }) => stopwatch(time),
         Some(Modes::Timer { start_time: time }) => timer(time),
         Some(Modes::Pomodoro { mode }) => match mode {
-            Some(PomoMode::Short) | None => pomodoro(25 * 60, 5 * 60, 10 * 60),
-            Some(PomoMode::Long) => pomodoro(55 * 60, 10 * 60, 20 * 60),
+            Some(PomoMode::Short) | None => pomodoro(
+                Duration::from_secs(25 * 60),
+                Duration::from_secs(5 * 60),
+                Duration::from_secs(10 * 60)
+            ),
+            Some(PomoMode::Long) => pomodoro(
+                Duration::from_secs(55 * 60),
+                Duration::from_secs(10 * 60),
+                Duration::from_secs(20 * 60)
+            ),
             Some(PomoMode::Custom {
                 work_time,
                 break_time,
                 long_break_time,
-            }) => pomodoro(work_time, break_time, long_break_time),
+            }) => pomodoro(
+                Duration::from_secs(work_time),
+                Duration::from_secs(break_time),
+                Duration::from_secs(long_break_time)
+            ),
         },
 
-        None => pomodoro(25 * 60, 5 * 60, 10 * 60),
+        None => pomodoro(
+            Duration::from_secs(25 * 60),
+            Duration::from_secs(5 * 60),
+            Duration::from_secs(10 * 60),
+        ),
     }
-    .map(|counter| {
-        println!("{}", fmt_time(counter));
+    .map(|time| {
+        println!("{}", fmt_time(time));
     })
 }
 
