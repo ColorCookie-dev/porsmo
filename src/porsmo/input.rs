@@ -1,9 +1,4 @@
-use std::{
-    io::stdin,
-    sync::mpsc::{self, Receiver},
-    thread,
-};
-use termion::{event::Key, input::TermRead};
+use crossterm::event::{ KeyCode, KeyEvent, KeyModifiers, Event};
 
 pub enum Command {
     Quit,
@@ -14,34 +9,77 @@ pub enum Command {
     Skip,
     Yes,
     No,
+    Invalid,
 }
 
-pub fn listen_for_inputs() -> Receiver<Command> {
-    let (tx, rx) = mpsc::sync_channel::<Command>(3);
-
-    thread::spawn(move || {
-        let stdin = stdin().keys();
-        for c in stdin {
-            match c.unwrap() {
-                Key::Char('q') => tx.try_send(Command::Quit).ok(),
-                Key::Ctrl('c') => tx.try_send(Command::Quit).ok(),
-                Key::Ctrl('z') => tx.try_send(Command::Quit).ok(),
-
-                Key::Char('S') => tx.try_send(Command::Skip).ok(),
-                Key::Char('y') => tx.try_send(Command::Yes).ok(),
-                Key::Char('n') => tx.try_send(Command::No).ok(),
-
-                Key::Char('\n') => tx.try_send(Command::Enter).ok(),
-                Key::Char('t') => tx.try_send(Command::Toggle).ok(),
-                Key::Char(' ') => tx.try_send(Command::Toggle).ok(),
-
-                Key::Char('p') => tx.try_send(Command::Pause).ok(),
-                Key::Char('c') => tx.try_send(Command::Resume).ok(),
-
-                _ => None,
-            };
+impl From<Event> for Command {
+    fn from(event: Event) -> Self {
+        match event {
+            Event::Key(key) => Command::from(key),
+            _ => Command::Invalid,
         }
-    });
+    }
+}
 
-    rx
+impl From<KeyEvent> for Command {
+    fn from(key: KeyEvent) -> Self {
+        match key {
+            KeyEvent {
+                code: KeyCode::Char('q'),
+                modifiers: KeyModifiers::NONE,
+                kind: _, state: _
+            } => Self::Quit,
+            KeyEvent {
+                code: KeyCode::Char('c'),
+                modifiers: KeyModifiers::CONTROL,
+                kind: _, state: _
+            } => Self::Quit,
+            KeyEvent {
+                code: KeyCode::Char('z'),
+                modifiers: KeyModifiers::CONTROL,
+                kind: _, state: _
+            } => Self::Quit,
+            KeyEvent {
+                code: KeyCode::Char(' '),
+                modifiers: KeyModifiers::NONE,
+                kind: _, state: _
+            } => Self::Toggle,
+            KeyEvent {
+                code: KeyCode::Enter,
+                modifiers: KeyModifiers::NONE,
+                kind: _, state: _
+            } => Self::Enter,
+            KeyEvent {
+                code: KeyCode::Char('S'),
+                modifiers: KeyModifiers::SHIFT,
+                kind: _, state: _
+            } => Self::Skip,
+            KeyEvent {
+                code: KeyCode::Char('y'),
+                modifiers: KeyModifiers::NONE,
+                kind: _, state: _
+            } => Self::Yes,
+            KeyEvent {
+                code: KeyCode::Char('n'),
+                modifiers: KeyModifiers::NONE,
+                kind: _, state: _
+            } => Self::No,
+            KeyEvent {
+                code: KeyCode::Char('t'),
+                modifiers: KeyModifiers::NONE,
+                kind: _, state: _
+            } => Self::Toggle,
+            KeyEvent {
+                code: KeyCode::Char('p'),
+                modifiers: KeyModifiers::NONE,
+                kind: _, state: _
+            } => Self::Pause,
+            KeyEvent {
+                code: KeyCode::Char('c'),
+                modifiers: KeyModifiers::NONE,
+                kind: _, state: _
+            } => Self::Resume,
+            _ => Self::Invalid,
+        }
+    }
 }

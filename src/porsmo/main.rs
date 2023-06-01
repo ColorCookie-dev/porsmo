@@ -1,3 +1,4 @@
+mod prelude;
 mod alert;
 mod format;
 mod input;
@@ -8,11 +9,11 @@ mod stopwatch;
 mod terminal;
 mod timer;
 
-use std::time::Duration;
-
 use crate::format::fmt_time;
-use crate::{pomodoro::pomodoro, stopwatch::stopwatch, timer::timer};
-use anyhow::{bail, Result};
+use crate::prelude::*;
+use pomodoro::PomodoroUI;
+use stopwatch::StopwatchUI;
+use timer::TimerUI;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
@@ -75,40 +76,11 @@ enum PomoMode {
     },
 }
 
-pub struct PomodoroUI;
-
-impl PomodoroUI {
-    fn short() -> Result<Duration> {
-        pomodoro(
-            Duration::from_secs(25 * 60),
-            Duration::from_secs(5 * 60),
-            Duration::from_secs(10 * 60),
-        )
-    }
-
-    fn long() -> Result<Duration> {
-        pomodoro(
-            Duration::from_secs(55 * 60),
-            Duration::from_secs(10 * 60),
-            Duration::from_secs(20 * 60),
-        )
-    }
-
-    fn from_secs(work_time: u64, break_time: u64, long_break_time: u64)
-    -> Result<Duration> {
-        pomodoro(
-            Duration::from_secs(work_time),
-            Duration::from_secs(break_time),
-            Duration::from_secs(long_break_time)
-        )
-    }
-}
-
 fn main() -> Result<()> {
     let args = Cli::parse();
     match args.mode {
-        Some(Modes::Stopwatch { start_time: time }) => stopwatch(time),
-        Some(Modes::Timer { start_time: time }) => timer(time),
+        Some(Modes::Stopwatch { start_time }) => StopwatchUI::from_secs(start_time),
+        Some(Modes::Timer { start_time }) => TimerUI::from_secs(start_time),
         Some(Modes::Pomodoro { mode }) => match mode {
             Some(PomoMode::Short) | None => PomodoroUI::short(),
             Some(PomoMode::Long) => PomodoroUI::long(),

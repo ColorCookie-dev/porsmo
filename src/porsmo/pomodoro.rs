@@ -1,17 +1,46 @@
 use crate::{
     alert::alert,
     format::fmt_time,
-    input::{listen_for_inputs, Command},
+    input::Command,
     terminal::TerminalHandler,
 };
-use anyhow::Result;
-use crossterm::style::Color;
+use crate::prelude::*;
+use crossterm::{style::Color, event};
 use porsmo::{
     counter::Counter,
     pomodoro::{Mode, Pomodoro},
     stopwatch::Stopwatch,
 };
-use std::{fmt::Display, sync::mpsc::Receiver, thread, time::Duration};
+use std::{fmt::Display, thread, time::Duration};
+
+pub struct PomodoroUI;
+
+impl PomodoroUI {
+    pub fn short() -> Result<Duration> {
+        pomodoro(
+            Duration::from_secs(25 * 60),
+            Duration::from_secs(5 * 60),
+            Duration::from_secs(10 * 60),
+        )
+    }
+
+    pub fn long() -> Result<Duration> {
+        pomodoro(
+            Duration::from_secs(55 * 60),
+            Duration::from_secs(10 * 60),
+            Duration::from_secs(20 * 60),
+        )
+    }
+
+    pub fn from_secs(work_time: u64, break_time: u64, long_break_time: u64)
+    -> Result<Duration> {
+        pomodoro(
+            Duration::from_secs(work_time),
+            Duration::from_secs(break_time),
+            Duration::from_secs(long_break_time)
+        )
+    }
+}
 
 pub fn pomodoro(
     work_time: Duration,
@@ -20,42 +49,33 @@ pub fn pomodoro(
     ) -> Result<Duration> {
     let mut pomo = Pomodoro::new(work_time, break_time, long_break_time);
     let mut terminal = TerminalHandler::new()?;
-    let rx = listen_for_inputs();
 
     loop {
-        match rx.try_recv() {
-            Ok(Command::Quit) => {
-                break;
+        if event::poll(Duration::from_millis(250))
+            .with_context(|| "Polling failed")? {
+            let event = event::read().with_context(|| "Failed to read event")?;
+            let command = Command::from(event);
+            match command {
+                Command::Quit => break,
+                Command::Pause => pomo.pause(),
+                Command::Resume => pomo.resume(),
+                Command::Toggle | Command::Enter => pomo.toggle(),
+                Command::Skip => {
+                    pomo.pause();
+                    if skip_prompt(&mut terminal, pomo.check_next_mode(), pomo.session())? {
+                        pomo.next_mode()
+                    } else {
+                        pomo.resume();
+                    }
+                },
+                _ => (),
             }
-
-            Ok(Command::Pause) => {
-                pomo.pause();
-            }
-
-            Ok(Command::Resume) => {
-                pomo.resume();
-            }
-
-            Ok(Command::Toggle) | Ok(Command::Enter) => {
-                pomo.toggle();
-            }
-
-            Ok(Command::Skip) => {
-                pomo.pause();
-                if skip_prompt(&mut terminal, &rx, pomo.check_next_mode(), pomo.session())? {
-                    pomo.next_mode()
-                } else {
-                    pomo.resume();
-                }
-            }
-
-            _ => (),
         }
 
         if pomo.has_ended() {
             alert_pomo(pomo.check_next_mode());
             let (counter, next) =
-                start_excess_counting(&mut terminal, &rx, pomo.check_next_mode(), pomo.session())?;
+                start_excess_counting(&mut terminal, pomo.check_next_mode(), pomo.session())?;
             if next {
                 pomo.next_mode();
             } else {
@@ -85,24 +105,24 @@ pub fn pomodoro(
 
 fn skip_prompt(
     terminal: &mut TerminalHandler,
-    rx: &Receiver<Command>,
     next_mode: Mode,
     session: u64,
 ) -> Result<bool> {
     loop {
-        match rx.try_recv() {
-            Ok(Command::Quit) | Ok(Command::No) => {
-                return Ok(false);
+        if event::poll(Duration::from_millis(250))
+            .with_context(|| "Polling failed")? {
+            let event = event::read().with_context(|| "Failed to read event")?;
+            let command = Command::from(event);
+            match command {
+                Command::Quit | Command::No => return Ok(false),
+                Command::Yes => return Ok(true),
+                _ => show_prompt_pomo(
+                    terminal,
+                    next_mode,
+                    format!("Round: {}", session)
+                )?,
             }
-
-            Ok(Command::Yes) | Ok(Command::Enter) => {
-                return Ok(true);
-            }
-
-            _ => (),
         }
-
-        show_prompt_pomo(terminal, next_mode, format!("Round: {}", session))?;
 
         thread::sleep(Duration::from_millis(100));
     }
@@ -110,34 +130,27 @@ fn skip_prompt(
 
 fn start_excess_counting(
     terminal: &mut TerminalHandler,
-    rx: &Receiver<Command>,
     next_mode: Mode,
     session: u64,
 ) -> Result<(Duration, bool)> {
     let mut st = Stopwatch::new(Duration::ZERO);
 
     loop {
-        match rx.try_recv() {
-            Ok(Command::Quit) => {
-                st.end_count();
-                break;
+        if event::poll(Duration::from_millis(250))
+            .with_context(|| "Polling failed")? {
+            let event = event::read().with_context(|| "Failed to read event")?;
+            let command = Command::from(event);
+            match command {
+                Command::Quit => {
+                    st.end_count();
+                    break;
+                },
+                Command::Pause => st.pause(),
+                Command::Resume => st.resume(),
+                Command::Toggle => st.toggle(),
+                Command::Enter => return Ok((st.elapsed(), true)),
+                _ => (),
             }
-
-            Ok(Command::Pause) => {
-                st.pause();
-            }
-
-            Ok(Command::Resume) => {
-                st.resume();
-            }
-
-            Ok(Command::Toggle) => {
-                st.toggle();
-            }
-
-            Ok(Command::Enter) => return Ok((st.elapsed(), true)),
-
-            _ => (),
         }
 
         let title = match next_mode {

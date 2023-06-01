@@ -1,39 +1,46 @@
 use crate::{
     format::fmt_time,
-    input::{listen_for_inputs, Command},
+    input::Command,
     terminal::TerminalHandler,
 };
-use anyhow::Result;
+use crate::prelude::*;
+use crossterm::event;
 use porsmo::{counter::Counter, stopwatch::Stopwatch};
-use std::{sync::mpsc::Receiver, thread, time::Duration};
+use std::{thread, time::Duration};
+
+pub struct StopwatchUI;
+
+impl StopwatchUI {
+    pub fn new(time: Duration) -> Result<Duration> {
+        stopwatch(time)
+    }
+
+    pub fn from_secs(time: u64) -> Result<Duration> {
+        stopwatch(Duration::from_secs(time))
+    }
+}
 
 pub fn default_stopwatch_loop(
-    rx: &Receiver<Command>,
-    time: u64,
+    time: Duration,
     mut update: impl FnMut(&Stopwatch) -> Result<()>,
 ) -> Result<Duration> {
-    let mut st = Stopwatch::new(Duration::from_secs(time));
+    let mut st = Stopwatch::new(time);
 
     loop {
-        match rx.try_recv() {
-            Ok(Command::Quit) => {
-                st.end_count();
-                break;
+        if event::poll(Duration::from_millis(250))
+            .with_context(|| "Polling failed")? {
+            let event = event::read().with_context(|| "Failed to read event")?;
+            let command = Command::from(event);
+            match command {
+                Command::Quit => {
+                    st.end_count();
+                    break;
+                }
+                Command::Pause => st.pause(),
+                Command::Resume => st.resume(),
+                Command::Toggle | Command::Enter => st.toggle(),
+                _ => (),
             }
-
-            Ok(Command::Pause) => {
-                st.pause();
-            }
-
-            Ok(Command::Resume) => {
-                st.resume();
-            }
-
-            Ok(Command::Toggle) | Ok(Command::Enter) => {
-                st.toggle();
-            }
-
-            _ => (),
         }
 
         update(&st)?;
@@ -44,11 +51,10 @@ pub fn default_stopwatch_loop(
     Ok(st.elapsed())
 }
 
-pub fn stopwatch(time: u64) -> Result<Duration> {
+pub fn stopwatch(time: Duration) -> Result<Duration> {
     let mut terminal = TerminalHandler::new()?;
-    let rx = listen_for_inputs();
 
-    default_stopwatch_loop(&rx, time, move |st| {
+    default_stopwatch_loop(time, move |st| {
         terminal.show_counter(
             "StopWatch",
             fmt_time(st.elapsed()),

@@ -21,5 +21,4 @@ anyhow = "1.0"
 notify-rust = "4"
 rodio = "0.12.0"
 crossterm = "0.26.1"
-termion = "2.0.1"
 clap = { version = "4.3.0", features = ["derive"] }
