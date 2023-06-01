@@ -75,22 +75,30 @@ enum PomoMode {
     },
 }
 
+fn short_pomodoro() -> Result<Duration> {
+    pomodoro(
+        Duration::from_secs(25 * 60),
+        Duration::from_secs(5 * 60),
+        Duration::from_secs(10 * 60),
+    )
+}
+
+fn long_pomodoro() -> Result<Duration> {
+    pomodoro(
+        Duration::from_secs(55 * 60),
+        Duration::from_secs(10 * 60),
+        Duration::from_secs(20 * 60),
+    )
+}
+
 fn main() -> Result<()> {
     let args = Cli::parse();
     match args.mode {
         Some(Modes::Stopwatch { start_time: time }) => stopwatch(time),
         Some(Modes::Timer { start_time: time }) => timer(time),
         Some(Modes::Pomodoro { mode }) => match mode {
-            Some(PomoMode::Short) | None => pomodoro(
-                Duration::from_secs(25 * 60),
-                Duration::from_secs(5 * 60),
-                Duration::from_secs(10 * 60)
-            ),
-            Some(PomoMode::Long) => pomodoro(
-                Duration::from_secs(55 * 60),
-                Duration::from_secs(10 * 60),
-                Duration::from_secs(20 * 60)
-            ),
+            Some(PomoMode::Short) | None => short_pomodoro(),
+            Some(PomoMode::Long) => long_pomodoro(),
             Some(PomoMode::Custom {
                 work_time,
                 break_time,
@@ -101,12 +109,7 @@ fn main() -> Result<()> {
                 Duration::from_secs(long_break_time)
             ),
         },
-
-        None => pomodoro(
-            Duration::from_secs(25 * 60),
-            Duration::from_secs(5 * 60),
-            Duration::from_secs(10 * 60),
-        ),
+        None => short_pomodoro(),
     }
     .map(|time| {
         println!("{}", fmt_time(time));
