@@ -75,20 +75,24 @@ enum PomoMode {
     },
 }
 
-fn short_pomodoro() -> Result<Duration> {
-    pomodoro(
-        Duration::from_secs(25 * 60),
-        Duration::from_secs(5 * 60),
-        Duration::from_secs(10 * 60),
-    )
-}
+pub struct PomodoroUI;
 
-fn long_pomodoro() -> Result<Duration> {
-    pomodoro(
-        Duration::from_secs(55 * 60),
-        Duration::from_secs(10 * 60),
-        Duration::from_secs(20 * 60),
-    )
+impl PomodoroUI {
+    fn short() -> Result<Duration> {
+        pomodoro(
+            Duration::from_secs(25 * 60),
+            Duration::from_secs(5 * 60),
+            Duration::from_secs(10 * 60),
+        )
+    }
+
+    fn long() -> Result<Duration> {
+        pomodoro(
+            Duration::from_secs(55 * 60),
+            Duration::from_secs(10 * 60),
+            Duration::from_secs(20 * 60),
+        )
+    }
 }
 
 fn main() -> Result<()> {
@@ -97,8 +101,8 @@ fn main() -> Result<()> {
         Some(Modes::Stopwatch { start_time: time }) => stopwatch(time),
         Some(Modes::Timer { start_time: time }) => timer(time),
         Some(Modes::Pomodoro { mode }) => match mode {
-            Some(PomoMode::Short) | None => short_pomodoro(),
-            Some(PomoMode::Long) => long_pomodoro(),
+            Some(PomoMode::Short) | None => PomodoroUI::short(),
+            Some(PomoMode::Long) => PomodoroUI::long(),
             Some(PomoMode::Custom {
                 work_time,
                 break_time,
@@ -109,7 +113,7 @@ fn main() -> Result<()> {
                 Duration::from_secs(long_break_time)
             ),
         },
-        None => short_pomodoro(),
+        None => PomodoroUI::short(),
     }
     .map(|time| {
         println!("{}", fmt_time(time));
