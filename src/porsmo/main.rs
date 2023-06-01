@@ -93,6 +93,15 @@ impl PomodoroUI {
             Duration::from_secs(20 * 60),
         )
     }
+
+    fn from_secs(work_time: u64, break_time: u64, long_break_time: u64)
+    -> Result<Duration> {
+        pomodoro(
+            Duration::from_secs(work_time),
+            Duration::from_secs(break_time),
+            Duration::from_secs(long_break_time)
+        )
+    }
 }
 
 fn main() -> Result<()> {
@@ -103,15 +112,8 @@ fn main() -> Result<()> {
         Some(Modes::Pomodoro { mode }) => match mode {
             Some(PomoMode::Short) | None => PomodoroUI::short(),
             Some(PomoMode::Long) => PomodoroUI::long(),
-            Some(PomoMode::Custom {
-                work_time,
-                break_time,
-                long_break_time,
-            }) => pomodoro(
-                Duration::from_secs(work_time),
-                Duration::from_secs(break_time),
-                Duration::from_secs(long_break_time)
-            ),
+            Some(PomoMode::Custom {work_time, break_time, long_break_time, }) =>
+                PomodoroUI::from_secs(work_time, break_time, long_break_time),
         },
         None => PomodoroUI::short(),
     }
