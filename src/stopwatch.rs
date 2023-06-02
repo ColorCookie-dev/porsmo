@@ -1,4 +1,4 @@
-use crate::counter::Counter;
+use crate::counter::Countable;
 use std::time::{Instant, Duration};
 
 pub struct Stopwatch {
@@ -17,7 +17,7 @@ impl Stopwatch {
     }
 }
 
-impl Counter for Stopwatch {
+impl Countable for Stopwatch {
     fn has_ended(&self) -> bool {
         self.ended
     }

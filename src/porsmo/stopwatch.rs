@@ -5,7 +5,7 @@ use crate::{
 };
 use crate::prelude::*;
 use crossterm::event;
-use porsmo::{counter::Counter, stopwatch::Stopwatch};
+use porsmo::{counter::Countable, stopwatch::Stopwatch};
 use std::{thread, time::Duration};
 
 pub struct StopwatchUI;

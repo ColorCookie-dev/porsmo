@@ -1,4 +1,4 @@
-use crate::counter::Counter;
+use crate::counter::Countable;
 use std::time::{Instant, Duration};
 
 pub struct Timer {
@@ -15,7 +15,7 @@ impl Timer {
     }
 }
 
-impl Counter for Timer {
+impl Countable for Timer {
     fn has_ended(&self) -> bool {
         self.elapsed().is_zero()
     }

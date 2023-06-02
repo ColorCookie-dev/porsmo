@@ -9,8 +9,12 @@ mod stopwatch;
 mod terminal;
 mod timer;
 
+use std::time::Duration;
+
 use crate::format::fmt_time;
 use crate::prelude::*;
+use crossterm::event;
+use input::Command;
 use pomodoro::PomodoroUI;
 use stopwatch::StopwatchUI;
 use timer::TimerUI;
@@ -92,6 +96,8 @@ fn main() -> Result<()> {
     .map(|time| {
         println!("{}", fmt_time(time));
     })
+
+    // TODO: Move the event handling here and pass commands to UIs
 }
 
 fn parse_time(time_str: &str) -> Result<u64> {

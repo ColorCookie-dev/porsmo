@@ -7,7 +7,7 @@ use crate::{
 use crate::prelude::*;
 use crossterm::{style::Color, event};
 use porsmo::{
-    counter::Counter,
+    counter::Countable,
     pomodoro::{Mode, Pomodoro},
     stopwatch::Stopwatch,
 };

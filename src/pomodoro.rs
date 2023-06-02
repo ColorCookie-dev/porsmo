@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::{counter::Counter, timer::Timer};
+use crate::{counter::Countable, timer::Timer};
 
 pub struct Pomodoro {
     timer: Timer,
@@ -82,7 +82,7 @@ impl Pomodoro {
     }
 }
 
-impl Counter for Pomodoro {
+impl Countable for Pomodoro {
     fn has_ended(&self) -> bool {
         self.timer.has_ended()
     }

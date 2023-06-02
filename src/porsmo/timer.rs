@@ -7,7 +7,7 @@ use crate::{
 };
 use crate::prelude::*;
 use crossterm::event;
-use porsmo::{counter::Counter, timer::Timer};
+use porsmo::{counter::Countable, timer::Timer};
 use std::{thread, time::Duration};
 
 pub struct TimerUI;
