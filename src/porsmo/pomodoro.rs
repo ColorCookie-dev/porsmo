@@ -86,7 +86,7 @@ pub fn pomodoro(
         let title = match pomo.mode() {
             Mode::Work => "Pomodoro (Work)",
             Mode::Break => "Pomodoro (Break)",
-            Mode::LongBreak => "Pomodor (Long Break)",
+            Mode::LongBreak => "Pomodoro (Long Break)",
         };
 
         terminal.show_counter(
