@@ -97,7 +97,6 @@ pub fn pomodoro(
             format!("Round: {}", pomo.session()),
         )?;
 
-        thread::sleep(Duration::from_millis(100));
     }
 
     Ok(pomo.elapsed())
@@ -124,7 +123,6 @@ fn skip_prompt(
             }
         }
 
-        thread::sleep(Duration::from_millis(100));
     }
 }
 
@@ -167,7 +165,6 @@ fn start_excess_counting(
             format!("Round: {}", session),
         )?;
 
-        thread::sleep(Duration::from_millis(100));
     }
 
     Ok((st.elapsed(), false))

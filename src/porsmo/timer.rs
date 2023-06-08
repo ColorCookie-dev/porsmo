@@ -60,7 +60,6 @@ pub fn timer(time: Duration) -> Result<Duration> {
             "",
         )?;
 
-        thread::sleep(Duration::from_millis(100));
     }
 
     Ok(counter_ended_at)

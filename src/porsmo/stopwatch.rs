@@ -45,7 +45,6 @@ pub fn default_stopwatch_loop(
 
         update(&st)?;
 
-        thread::sleep(Duration::from_millis(100));
     }
 
     Ok(st.elapsed())
