@@ -2,7 +2,6 @@ mod prelude;
 mod alert;
 mod format;
 mod input;
-mod notification;
 mod pomodoro;
 mod stopwatch;
 mod terminal;

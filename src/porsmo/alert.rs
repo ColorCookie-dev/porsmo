@@ -1,9 +1,18 @@
 use anyhow::{Context, Result, anyhow};
 use rodio::{Decoder, OutputStream, Sink};
 use std::io::Cursor;
-use crate::notification::notify_default;
 use std::thread;
+use notify_rust::Notification;
 
+pub fn notify_default(title: &str, message: &str) -> Result<()> {
+    Notification::new()
+        .appname("Porsmo")
+        .summary(title)
+        .body(message)
+        .show()
+        .with_context(|| "Failed to show notification")?;
+    Ok(())
+}
 pub fn alert(title: String, message: String) {
     thread::spawn(move || {
         notify_default(&title, &message).unwrap();
