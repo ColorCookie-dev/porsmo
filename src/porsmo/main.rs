@@ -4,17 +4,12 @@ mod format;
 mod input;
 mod notification;
 mod pomodoro;
-mod sound;
 mod stopwatch;
 mod terminal;
 mod timer;
 
-use std::time::Duration;
-
 use crate::format::fmt_time;
 use crate::prelude::*;
-use crossterm::event;
-use input::Command;
 use pomodoro::PomodoroUI;
 use stopwatch::StopwatchUI;
 use timer::TimerUI;
