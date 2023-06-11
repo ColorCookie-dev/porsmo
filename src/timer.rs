@@ -1,60 +1,105 @@
-use crate::counter::Countable;
-use std::time::{Instant, Duration};
+use crate::counter::Counter;
+use std::{time::Duration, ops::{Sub, Add}};
 
 pub struct Timer {
-    started: Option<Instant>,
-    remaining: Duration,
+    counter: Counter,
+    initial: Duration,
 }
 
 impl Timer {
-    pub fn new(remaining: Duration) -> Self {
-        Self {
-            started: Some(Instant::now()),
-            remaining,
+    pub fn new(initial: Duration) -> Self {
+        Self { counter: Counter::ZERO, initial }
+    }
+
+    pub fn time_left(&self) -> Duration {
+        self.initial.saturating_sub(self.counter.elapsed())
+    }
+
+    pub fn ended(&self) -> bool {
+        self.time_left().is_zero()
+    }
+
+    pub fn started(&self) -> bool {
+        self.counter.started()
+    }
+
+    pub fn update(self) -> Self {
+        Self { counter: self.counter.update(), ..self }
+    }
+
+    pub fn stop(self) -> Self {
+        Self { counter: self.counter.stop(), ..self }
+    }
+
+    pub fn start(self) -> Self {
+        Self { counter: self.counter.start(), ..self }
+    }
+
+    pub fn toggle(self) -> Self {
+        Self { counter: self.counter.toggle(), ..self }
+    }
+}
+
+pub enum DoubleEndedDuration {
+    Positive(Duration),
+    Negative(Duration),
+}
+
+impl From<Duration> for DoubleEndedDuration {
+    fn from(value: Duration) -> Self {
+        DoubleEndedDuration::Positive(value)
+    }
+}
+
+impl Add for DoubleEndedDuration {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::Positive(lhs), Self::Positive(rhs)) =>
+                Self::Positive(lhs.saturating_add(rhs)),
+            (Self::Negative(lhs), Self::Positive(rhs)) =>
+                Self::Positive(rhs) - Self::Positive(lhs),
+            (Self::Positive(lhs), Self::Negative(rhs)) =>
+                Self::Positive(lhs) - Self::Positive(rhs),
+            (Self::Negative(lhs), Self::Negative(rhs)) =>
+                Self::Negative(lhs.saturating_add(rhs))
         }
     }
 }
 
-impl Countable for Timer {
-    fn has_ended(&self) -> bool {
-        self.elapsed().is_zero()
-    }
-
-    fn is_running(&self) -> bool {
-        !matches!(self.started, None)
-    }
-
-    fn elapsed(&self) -> Duration {
-        match self.started {
-            Some(started) => self.remaining.saturating_sub(started.elapsed()),
-            None => self.remaining,
+impl DoubleEndedDuration {
+    fn negate(self) -> Self {
+        match self {
+            Self::Positive(dur) => Self::Negative(dur),
+            Self::Negative(dur) => Self::Positive(dur),
         }
     }
+}
 
-    fn pause(&mut self) {
-        if self.is_running() {
-            self.remaining = self.elapsed();
-            self.started = None;
+impl Sub for DoubleEndedDuration {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::Positive(lhs), Self::Positive(rhs)) if lhs >= rhs =>
+                Self::Positive(lhs.saturating_sub(rhs)),
+            (Self::Positive(lhs), Self::Positive(rhs)) =>
+                Self::Negative(rhs.saturating_sub(lhs)),
+            (Self::Positive(lhs), Self::Negative(rhs)) =>
+                Self::Positive(lhs.saturating_add(rhs)),
+            (Self::Negative(lhs), Self::Positive(rhs)) =>
+                Self::Negative(lhs.saturating_add(rhs)),
+            (Self::Negative(lhs), Self::Negative(rhs)) =>
+                Self::Positive(rhs) - Self::Positive(lhs),
         }
     }
+}
 
-    fn resume(&mut self) {
-        if !self.is_running() {
-            self.started = Some(Instant::now());
-        }
-    }
+pub type ExcessTimer = Timer;
 
-    fn end_count(&mut self) {
-        self.pause();
-    }
-
-    fn toggle(&mut self) {
-        match self.started {
-            Some(started) => {
-                self.remaining = self.remaining.saturating_sub(started.elapsed());
-                self.started = None;
-            },
-            None => self.started = Some(Instant::now()),
-        }
+impl ExcessTimer {
+    pub fn excess_time_left(self) -> DoubleEndedDuration {
+        let updated_time = self.update();
+        DoubleEndedDuration::Positive(updated_time.initial) -
+            DoubleEndedDuration::Positive(updated_time.counter.get_elapsed())
     }
 }

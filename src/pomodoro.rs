@@ -1,15 +1,38 @@
 use std::time::Duration;
 
-use crate::{counter::Countable, timer::Timer};
+use crate::timer::ExcessTimer;
 
-pub struct Pomodoro {
-    timer: Timer,
-    mode: Mode,
-    session: u64,
+pub struct PomoConfig {
+    pub work_time: Duration,
+    pub break_time: Duration,
+    pub long_break: Duration,
+}
 
-    work_time: Duration,
-    break_time: Duration,
-    long_break_time: Duration,
+impl PomoConfig {
+    fn short() -> Self {
+        Self {
+            work_time: Duration::from_secs(25 * 60),
+            break_time: Duration::from_secs(5 * 60),
+            long_break: Duration::from_secs(10 * 60),
+        }
+    }
+
+    fn long() -> Self {
+        Self {
+            work_time: Duration::from_secs(55 * 60),
+            break_time: Duration::from_secs(10 * 60),
+            long_break: Duration::from_secs(20 * 60),
+        }
+    }
+
+    fn custom(work_time: Duration, break_time: Duration, long_break: Duration)
+        -> Self {
+        Self {
+            work_time,
+            break_time,
+            long_break,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -19,20 +42,20 @@ pub enum Mode {
     LongBreak,
 }
 
+pub struct Pomodoro {
+    timer: ExcessTimer,
+    mode: Mode,
+    session: u64,
+    config: PomoConfig,
+}
+
 impl Pomodoro {
-    pub fn new(
-        work_time: Duration,
-        break_time: Duration,
-        long_break_time: Duration
-        ) -> Self {
+    pub fn new(config: PomoConfig) -> Self {
         Self {
-            timer: Timer::new(work_time),
+            timer: ExcessTimer::new(config.work_time),
             mode: Mode::Work,
             session: 1,
-
-            work_time,
-            break_time,
-            long_break_time,
+            config,
         }
     }
 
@@ -68,50 +91,44 @@ impl Pomodoro {
     fn work_mode(&mut self) {
         self.session += 1;
         self.mode = Mode::Work;
-        self.timer = Timer::new(self.work_time);
+        self.timer = ExcessTimer::new(self.config.work_time);
     }
 
     fn break_mode(&mut self) {
         self.mode = Mode::Break;
-        self.timer = Timer::new(self.break_time);
+        self.timer = ExcessTimer::new(self.config.break_time);
     }
 
     fn long_break_mode(&mut self) {
         self.mode = Mode::LongBreak;
-        self.timer = Timer::new(self.long_break_time);
-    }
-}
-
-impl Countable for Pomodoro {
-    fn has_ended(&self) -> bool {
-        self.timer.has_ended()
+        self.timer = ExcessTimer::new(self.config.long_break);
     }
 
-    fn is_running(&self) -> bool {
-        self.timer.is_running()
+    pub fn time_left(&self) -> Duration {
+        self.timer.time_left()
     }
 
-    fn elapsed(&self) -> Duration {
-        self.timer.elapsed()
+    pub fn ended(&self) -> bool {
+        self.time_left().is_zero()
     }
 
-    fn pause(&mut self) {
-        self.timer.pause()
+    pub fn started(&self) -> bool {
+        self.timer.started()
     }
 
-    fn resume(&mut self) {
-        self.timer.resume()
+    pub fn update(self) -> Self {
+        Self { timer: self.timer.update(), ..self }
     }
 
-    fn end_count(&mut self) {
-        self.timer.pause();
+    pub fn stop(self) -> Self {
+        Self { timer: self.timer.stop(), ..self }
     }
 
-    fn toggle(&mut self) {
-        if self.is_running() {
-            self.timer.pause();
-        } else {
-            self.timer.resume();
-        }
+    pub fn start(self) -> Self {
+        Self { timer: self.timer.start(), ..self }
+    }
+
+    pub fn toggle(self) -> Self {
+        Self { timer: self.timer.toggle(), ..self }
     }
 }

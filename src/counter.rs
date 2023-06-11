@@ -1,35 +1,16 @@
-use std::{time::{Duration, Instant}, ops::Mul};
+use std::time::{Duration, Instant};
 
+#[derive(Clone, Copy)]
 pub struct Counter {
     start: Option<Instant>,
     elapsed: Duration,
 }
 
 impl Counter {
+    pub const ZERO: Self = Self { start: None, elapsed: Duration::ZERO };
+
     pub fn new(start: Option<Instant>, elapsed: Duration) -> Self {
         Self { start, elapsed }
-    }
-    
-    pub fn start(self) -> Self {
-        Self { start: Some(Instant::now()), elapsed: self.elapsed() }
-    }
-
-    pub fn elapsed(&self) -> Duration {
-        match self.start {
-            Some(start) => self.elapsed.saturating_add(start.elapsed()),
-            None => self.elapsed,
-        }
-    }
-
-    pub fn toggle(self) -> Self {
-        match self.start {
-            Some(start) => self.stop(),
-            None => self.start(),
-        }
-    }
-
-    pub fn stop(self) -> Self {
-        Self::new(None, self.elapsed())
     }
 
     pub fn started(&self) -> bool {
@@ -39,22 +20,60 @@ impl Counter {
     pub fn stopped(&self) -> bool {
         matches!(self.start, None)
     }
+
+    pub fn start(self) -> Self {
+        Self { start: Some(Instant::now()), ..self }
+    }
+
+    pub fn stop(self) -> Self {
+        Self { start: None, ..self }
+    }
+
+    pub fn toggle(self) -> Self {
+        match self.start {
+            Some(_start) => self.stop(),
+            None         => self.start(),
+        }
+    }
+
+    pub fn get_elapsed(&self) -> Duration {
+        self.elapsed
+    }
+
+    pub fn with_elapsed(self, duration: Duration) -> Self {
+        Self { elapsed: duration, ..self }
+    }
+
+    pub fn elapsed(self) -> Duration {
+        self.update().elapsed
+    }
+
+    pub fn update(self) -> Self {
+        self.update_with(Self::count_up)
+    }
+
+    pub fn update_with(self, updater: impl Fn(Duration, Duration) -> Duration)
+        -> Self {
+        self.with_elapsed(
+            self.start
+                .map(|start| updater(self.elapsed, start.elapsed()))
+                .unwrap_or(self.elapsed)
+        )
+    }
+
+    pub fn count_up(before: Duration, elapsed_now: Duration) -> Duration {
+        before.saturating_add(elapsed_now)
+    }
+
+    pub fn count_down(before: Duration, elapsed_now: Duration) -> Duration {
+        before.saturating_sub(elapsed_now)
+    }
 }
 
 impl Default for Counter {
     fn default() -> Self {
-        Self { start: None, elapsed: Duration::ZERO }
+        Self::ZERO
     }
-}
-
-pub trait Countable {
-    fn is_running(&self) -> bool;
-    fn has_ended(&self) -> bool;
-    fn elapsed(&self) -> Duration;
-    fn pause(&mut self);
-    fn resume(&mut self);
-    fn end_count(&mut self);
-    fn toggle(&mut self);
 }
 
 #[test]
