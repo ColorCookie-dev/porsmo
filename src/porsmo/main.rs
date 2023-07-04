@@ -10,15 +10,12 @@ mod app;
 
 use std::time::Duration;
 use app::PorsmoUI;
-use crate::format::{fmt_time, parse_time};
+use crate::format::parse_time;
 use crate::prelude::*;
-use crossterm::event::{self, Event};
+use crossterm::event;
 use input::Command;
-use pomodoro::PomodoroUI;
 use porsmo::pomodoro::PomoConfig;
-use stopwatch::{StopwatchUI, CounterApp};
 use terminal::TerminalHandler;
-use timer::TimerUI;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]

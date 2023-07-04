@@ -1,5 +1,5 @@
 use std::time::Duration;
-use anyhow::{Result, bail};
+use crate::prelude::*;
 
 pub fn fmt_time(time: Duration) -> String {
     let secs = time.as_secs();
