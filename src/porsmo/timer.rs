@@ -25,10 +25,6 @@ impl TimerUI {
         }
     }
 
-    pub fn from_secs(time: u64) -> Self {
-        Self::new(Duration::from_secs(time))
-    }
-
     pub fn ended(&self) -> bool {
         self.quit
     }

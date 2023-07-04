@@ -15,11 +15,7 @@ pub struct StopwatchUI {
 
 impl StopwatchUI {
     pub fn new(time: Duration) -> Self {
-        Self { counter: Stopwatch::default().start(), quit: false }
-    }
-
-    pub fn from_secs(time: u64) -> Self {
-        Self::new(Duration::from_secs(time))
+        Self { counter: Stopwatch::new(None, time).start(), quit: false }
     }
 }
 
