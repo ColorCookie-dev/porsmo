@@ -1,4 +1,5 @@
 use std::time::Duration;
+use anyhow::{Result, bail};
 
 pub fn fmt_time(time: Duration) -> String {
     let secs = time.as_secs();
@@ -21,5 +22,61 @@ pub fn fmt_time(time: Duration) -> String {
             secs / 60 % 60,
             secs % 60
         )
+    }
+}
+
+pub fn parse_time(time_str: &str) -> Result<u64> {
+    let mut secs = 0u64;
+
+    for (i, e) in time_str.split(':').rev().enumerate() {
+        if e.is_empty() {
+            continue;
+        }
+
+        let en = e.parse::<u64>()?;
+
+        if i == 0 {
+            secs += en;
+        } else if i == 1 {
+            secs += en * 60;
+        } else if i == 2 {
+            secs += en * 60 * 60;
+        } else if i == 3 {
+            secs += en * 3600 * 24;
+        } else {
+            bail!("Bad number of ':'");
+        }
+    }
+
+    Ok(secs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_parse_time() -> Result<()> {
+        let ok_cases = vec![
+            ("", 0),
+            (":", 0),
+            ("::10", 10),
+            ("1020", 1020),
+            ("2:000092", 2 * 60 + 92),
+            ("2:", 2 * 60),
+            ("2:2:2", (2 * 60 + 2) * 60 + 2),
+            ("1:::", 1 * 24 * 60 * 60),
+        ];
+
+        for (inp, out) in ok_cases.iter() {
+            assert_eq!(parse_time(inp)?, *out);
+        }
+
+        let err_cases = vec!["1::::", "kjdf:kjfk", ":kjfk", "1:4k:5"];
+
+        for inp in err_cases.iter() {
+            assert!(parse_time(inp).is_err());
+        }
+
+        Ok(())
     }
 }

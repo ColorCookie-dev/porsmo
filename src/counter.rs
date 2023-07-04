@@ -1,14 +1,30 @@
 use std::time::{Duration, Instant};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Counter {
     start: Option<Instant>,
     elapsed: Duration,
 }
 
-impl Counter {
-    pub const ZERO: Self = Self { start: None, elapsed: Duration::ZERO };
+impl From<Duration> for Counter {
+    fn from(elapsed: Duration) -> Self {
+        Self { start: None, elapsed }
+    }
+}
 
+impl Into<Duration> for Counter {
+    fn into(self) -> Duration {
+        self.elapsed()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum DoubleEndedDuration {
+    Positive(Duration),
+    Negative(Duration),
+}
+
+impl Counter {
     pub fn new(start: Option<Instant>, elapsed: Duration) -> Self {
         Self { start, elapsed }
     }
@@ -21,12 +37,30 @@ impl Counter {
         matches!(self.start, None)
     }
 
-    pub fn start(self) -> Self {
-        Self { start: Some(Instant::now()), ..self }
+    pub fn checked_time_left(&self, initial: Duration) -> DoubleEndedDuration {
+        match initial.checked_sub(self.elapsed()) {
+            Some(x) => DoubleEndedDuration::Positive(x),
+            None => DoubleEndedDuration::Negative(
+                self.elapsed().saturating_sub(initial)
+            ),
+        }
+    }
+
+    pub fn start(mut self) -> Self {
+        if let None = self.start {
+            self.start = Some(Instant::now());
+        }
+        self
     }
 
     pub fn stop(self) -> Self {
-        Self { start: None, ..self }
+        Self { start: None, elapsed: self.elapsed() }
+    }
+
+    pub fn elapsed(self) -> Duration {
+        self.start
+            .map(|start| start.elapsed())
+            .map_or(self.elapsed, |dur| self.elapsed.saturating_add(dur))
     }
 
     pub fn toggle(self) -> Self {
@@ -34,45 +68,6 @@ impl Counter {
             Some(_start) => self.stop(),
             None         => self.start(),
         }
-    }
-
-    pub fn get_elapsed(&self) -> Duration {
-        self.elapsed
-    }
-
-    pub fn with_elapsed(self, duration: Duration) -> Self {
-        Self { elapsed: duration, ..self }
-    }
-
-    pub fn elapsed(self) -> Duration {
-        self.update().elapsed
-    }
-
-    pub fn update(self) -> Self {
-        self.update_with(Self::count_up)
-    }
-
-    pub fn update_with(self, updater: impl Fn(Duration, Duration) -> Duration)
-        -> Self {
-        self.with_elapsed(
-            self.start
-                .map(|start| updater(self.elapsed, start.elapsed()))
-                .unwrap_or(self.elapsed)
-        )
-    }
-
-    pub fn count_up(before: Duration, elapsed_now: Duration) -> Duration {
-        before.saturating_add(elapsed_now)
-    }
-
-    pub fn count_down(before: Duration, elapsed_now: Duration) -> Duration {
-        before.saturating_sub(elapsed_now)
-    }
-}
-
-impl Default for Counter {
-    fn default() -> Self {
-        Self::ZERO
     }
 }
 

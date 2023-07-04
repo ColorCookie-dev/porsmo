@@ -26,58 +26,47 @@ impl From<KeyEvent> for Command {
         match key {
             KeyEvent {
                 code: KeyCode::Char('q'),
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                modifiers: KeyModifiers::NONE, ..
             } => Self::Quit,
             KeyEvent {
                 code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-                kind: _, state: _
+                modifiers: KeyModifiers::CONTROL, ..
             } => Self::Quit,
             KeyEvent {
                 code: KeyCode::Char('z'),
-                modifiers: KeyModifiers::CONTROL,
-                kind: _, state: _
+                modifiers: KeyModifiers::CONTROL, ..
             } => Self::Quit,
             KeyEvent {
                 code: KeyCode::Char(' '),
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                modifiers: KeyModifiers::NONE, ..
             } => Self::Toggle,
             KeyEvent {
                 code: KeyCode::Enter,
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                modifiers: KeyModifiers::NONE, ..
             } => Self::Enter,
             KeyEvent {
                 code: KeyCode::Char('S'),
-                modifiers: KeyModifiers::SHIFT,
-                kind: _, state: _
+                modifiers: KeyModifiers::SHIFT, ..
             } => Self::Skip,
             KeyEvent {
                 code: KeyCode::Char('y'),
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                modifiers: KeyModifiers::NONE, ..
             } => Self::Yes,
             KeyEvent {
                 code: KeyCode::Char('n'),
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                modifiers: KeyModifiers::NONE, ..
             } => Self::No,
             KeyEvent {
                 code: KeyCode::Char('t'),
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                modifiers: KeyModifiers::NONE, ..
             } => Self::Toggle,
             KeyEvent {
                 code: KeyCode::Char('p'),
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                modifiers: KeyModifiers::NONE, ..
             } => Self::Pause,
             KeyEvent {
                 code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                modifiers: KeyModifiers::NONE, ..
             } => Self::Resume,
             _ => Self::Invalid,
         }

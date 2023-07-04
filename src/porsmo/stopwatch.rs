@@ -1,66 +1,68 @@
+use crate::terminal::running_color;
 use crate::{
     format::fmt_time,
     input::Command,
     terminal::TerminalHandler,
 };
 use crate::prelude::*;
-use crossterm::event;
-use porsmo::{counter::Countable, stopwatch::Stopwatch};
-use std::{thread, time::Duration};
+use porsmo::counter::Counter as Stopwatch;
+use std::time::Duration;
 
-pub struct StopwatchUI;
+pub struct StopwatchUI {
+    counter: Stopwatch,
+    quit: bool,
+}
 
 impl StopwatchUI {
-    pub fn new(time: Duration) -> Result<Duration> {
-        stopwatch(time)
+    pub fn new(time: Duration) -> Self {
+        Self { counter: Stopwatch::default().start(), quit: false }
     }
 
-    pub fn from_secs(time: u64) -> Result<Duration> {
-        stopwatch(Duration::from_secs(time))
+    pub fn from_secs(time: u64) -> Self {
+        Self::new(Duration::from_secs(time))
     }
 }
 
-pub fn default_stopwatch_loop(
-    time: Duration,
-    mut update: impl FnMut(&Stopwatch) -> Result<()>,
-) -> Result<Duration> {
-    let mut st = Stopwatch::new(time);
+impl CounterApp for StopwatchUI {
+    type Output = Self;
 
-    loop {
-        if event::poll(Duration::from_millis(250))
-            .with_context(|| "Polling failed")? {
-            let event = event::read().with_context(|| "Failed to read event")?;
-            let command = Command::from(event);
-            match command {
-                Command::Quit => {
-                    st.end_count();
-                    break;
-                }
-                Command::Pause => st.pause(),
-                Command::Resume => st.resume(),
-                Command::Toggle | Command::Enter => st.toggle(),
-                _ => (),
-            }
-        }
-
-        update(&st)?;
-
-        thread::sleep(Duration::from_millis(100));
+    fn quit(self) -> Self::Output {
+        Self { counter: self.counter.stop(), quit: true, ..self }
     }
 
-    Ok(st.elapsed())
+    fn ended(&self) -> bool {
+        self.quit
+    }
+
+    fn handle_command(mut self, command: Command) -> Self::Output {
+        self.counter = match command {
+            Command::Quit => {
+                self.quit = true;
+                self.counter.stop()
+            },
+            Command::Pause => self.counter.stop(),
+            Command::Resume => self.counter.start(),
+            Command::Toggle | Command::Enter => self.counter.toggle(),
+            _ => self.counter,
+        };
+        self
+    }
+
+    fn show(&self, terminal: &mut TerminalHandler) -> Result<()> {
+        terminal
+            .clear()?
+            .info("Stopwatch")?
+            .set_foreground_color(running_color(self.counter.started()))?
+            .print(fmt_time(self.counter.elapsed()))?
+            .info("[Q]: quit, [Space]: pause/resume")?
+            .flush()
+    }
 }
 
-pub fn stopwatch(time: Duration) -> Result<Duration> {
-    let mut terminal = TerminalHandler::new()?;
-
-    default_stopwatch_loop(time, move |st| {
-        terminal.show_counter(
-            "StopWatch",
-            fmt_time(st.elapsed()),
-            st.is_running(),
-            "[Q]: quit, [Space]: pause/resume",
-            "",
-        )
-    })
+pub trait CounterApp {
+    type Output;
+    fn show(&self, terminal: &mut TerminalHandler) -> Result<()>;
+    fn ended(&self) -> bool;
+    fn quit(self) -> Self::Output;
+    fn handle_command(self, command: Command) -> Self::Output;
 }
