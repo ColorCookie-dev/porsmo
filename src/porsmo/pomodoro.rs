@@ -1,3 +1,4 @@
+use crate::alert::Alert;
 use crate::terminal::running_color;
 use crate::{
     alert::alert,
@@ -22,6 +23,7 @@ pub struct PomodoroUI {
     session: Session,
     quit: bool,
     skip: bool,
+    alert: Alert,
 }
 
 impl PomodoroUI {
@@ -29,6 +31,7 @@ impl PomodoroUI {
         Self {
             counter: Counter::default().start(),
             session: Session::default(),
+            alert: Alert::default(),
             config,
             quit: false,
             skip: false,
@@ -48,6 +51,13 @@ impl PomodoroUI {
         self.quit
     }
 
+    pub fn time_left(&self) -> Duration {
+        self.counter
+            .saturating_time_left(self.session
+                                      .mode()
+                                      .initial(self.config))
+    }
+
     pub fn excess_time_left(&self) -> DoubleEndedDuration {
         self.counter.checked_time_left(self.session.mode().initial(self.config))
     }
@@ -57,7 +67,11 @@ impl PomodoroUI {
     }
 
     pub fn next_mode(self) -> Self {
-        Self { session: self.session.next(), ..self }
+        Self {
+            counter: Counter::default().start(),
+            session: self.session.next(),
+            ..self
+        }
     }
 
     pub fn check_next_mode(&self) -> Mode {
@@ -65,6 +79,8 @@ impl PomodoroUI {
     }
 
     const CONTROLS: &str = "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume";
+    const ENDING_CONTROLS: &str =
+        "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume, [Enter]: Next";
     const SKIP_CONTROLS: &str = "[Enter]: Yes, [Q/N]: No";
 
     pub fn show(&self, terminal: &mut TerminalHandler) -> Result<()> {
@@ -99,6 +115,8 @@ impl PomodoroUI {
 
         match self.excess_time_left() {
             DoubleEndedDuration::Positive(elapsed) => {
+                self.alert.reset();
+
                 let title = match self.session.mode() {
                     Mode::Work => "Pomodoro (Work)",
                     Mode::Break => "Pomodoro (Break)",
@@ -115,6 +133,11 @@ impl PomodoroUI {
                     .flush()?;
             }
             DoubleEndedDuration::Negative(elapsed) => {
+                let (title, message) = Self::pomodoro_alert_message(
+                    self.check_next_mode()
+                );
+                self.alert.alert(title, message);
+
                 let title = match self.check_next_mode() {
                     Mode::Work => "Break has ended! Start work?",
                     Mode::Break => "Work has ended! Start break?",
@@ -126,7 +149,7 @@ impl PomodoroUI {
                     .info(title)?
                     .set_foreground_color(running_color(self.counter.started()))?
                     .print(format_args!("+{}", fmt_time(elapsed)))?
-                    .info(Self::CONTROLS)?
+                    .info(Self::ENDING_CONTROLS)?
                     .status(format!("Round: {}", self.session.session()))?
                     .flush()?;
             }
@@ -143,41 +166,44 @@ impl PomodoroUI {
     }
 
     pub fn handle_command(mut self, command: Command) -> Self {
-        self.counter = match command {
+        match command {
             Command::Quit | Command::No if self.skip =>
                 return self.cancel_skip(),
 
             Command::Enter | Command::Yes if self.skip =>
                 return self.cancel_skip().next_mode(),
 
+            Command::Enter if self.time_left().is_zero() =>
+                return self.next_mode(),
+
             Command::Quit =>
                 return self.quit(),
 
             Command::Pause =>
-                self.counter.stop(),
+                self.counter = self.counter.stop(),
 
             Command::Resume =>
-                self.counter.start(),
+                self.counter = self.counter.start(),
 
-            Command::Toggle | Command::Enter =>
-                self.counter.toggle(),
+            Command::Toggle =>
+                self.counter = self.counter.toggle(),
 
             Command::Skip =>
                 return self.start_skip(),
 
-            _ => return self,
+            _ => (),
         };
         self
     }
 
-    pub fn alert_pomo(&self) {
-        let (heading, message) = match self.check_next_mode() {
+    pub fn pomodoro_alert_message(next_mode: Mode) -> (String, String) {
+        let (heading, message) = match next_mode {
             Mode::Work => ("Your break ended!", "Time for some work"),
             Mode::Break => ("Pomodoro ended!", "Time for a short break"),
             Mode::LongBreak => ("Pomodoro 4 sessions complete!", "Time for a long break"),
         };
 
-        alert(heading, message);
+        (heading.into(), message.into())
     }
 }
 
