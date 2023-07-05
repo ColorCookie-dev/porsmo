@@ -34,6 +34,3 @@ A rust program for pomodoro, timer, stopwatch - all in one.
 - Alarm (works like timer, but accepts absolute time rather than a period of time)
 - Stopwatch
 - Server and GUI client or inbuilt gui
-
-# Known Regressions in the Current Version
-- [ ] alert sound not playing when timer ends
