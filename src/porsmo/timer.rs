@@ -1,3 +1,4 @@
+use crate::alert::Alert;
 use crate::terminal::running_color;
 use crate::{
     alert::alert,
@@ -8,13 +9,12 @@ use crate::{
 use crate::prelude::*;
 use porsmo::counter::Counter;
 use porsmo::counter::DoubleEndedDuration;
-use std::cell::RefCell;
 use std::time::Duration;
 
 pub struct TimerUI {
     counter: Counter,
     initial: Duration,
-    alerted: RefCell<bool>,
+    alert: Alert,
     quit: bool,
 }
 
@@ -23,7 +23,7 @@ impl TimerUI {
         Self {
             counter: Counter::default().start(),
             initial,
-            alerted: RefCell::new(false),
+            alert: Alert::new(),
             quit: false,
         }
     }
@@ -54,6 +54,7 @@ impl TimerUI {
     pub fn show(&self, terminal: &mut TerminalHandler) -> Result<()> {
         match self.excess_time_left() {
             DoubleEndedDuration::Positive(elapsed) => {
+                self.alert.reset();
                 terminal
                     .clear()?
                     .info("Timer")?
@@ -63,13 +64,10 @@ impl TimerUI {
                     .flush()?;
             }
             DoubleEndedDuration::Negative(elapsed) => {
-                if !*self.alerted.borrow() {
-                    let title = "The timer has ended!";
-                    let initial = fmt_time(self.initial.clone());
-                    let message = format!("Your Timer of {initial} has ended");
-                    alert(title, message);
-                    self.alerted.replace(true);
-                }
+                let title = "The timer has ended!";
+                let initial = fmt_time(self.initial.clone());
+                let message = format!("Your Timer of {initial} has ended");
+                self.alert.alert(title, message);
 
                 terminal
                     .clear()?
