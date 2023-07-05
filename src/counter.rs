@@ -1,17 +1,79 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-pub trait Counter {
-    fn is_running(&self) -> bool;
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Counter {
+    start: Option<Instant>,
+    elapsed: Duration,
+}
 
-    fn has_ended(&self) -> bool;
+impl From<Duration> for Counter {
+    fn from(elapsed: Duration) -> Self {
+        Self { start: None, elapsed }
+    }
+}
 
-    fn elapsed(&self) -> Duration;
+impl Into<Duration> for Counter {
+    fn into(self) -> Duration {
+        self.elapsed()
+    }
+}
 
-    fn pause(&mut self);
+#[derive(Debug, Clone, Copy)]
+pub enum DoubleEndedDuration {
+    Positive(Duration),
+    Negative(Duration),
+}
 
-    fn resume(&mut self);
+impl Counter {
+    pub fn new(start: Option<Instant>, elapsed: Duration) -> Self {
+        Self { start, elapsed }
+    }
 
-    fn end_count(&mut self);
+    pub fn started(&self) -> bool {
+        matches!(self.start, Some(_))
+    }
 
-    fn toggle(&mut self);
+    pub fn stopped(&self) -> bool {
+        matches!(self.start, None)
+    }
+
+    pub fn checked_time_left(&self, initial: Duration) -> DoubleEndedDuration {
+        match initial.checked_sub(self.elapsed()) {
+            Some(x) => DoubleEndedDuration::Positive(x),
+            None => DoubleEndedDuration::Negative(
+                self.elapsed().saturating_sub(initial)
+            ),
+        }
+    }
+
+    pub fn start(mut self) -> Self {
+        if let None = self.start {
+            self.start = Some(Instant::now());
+        }
+        self
+    }
+
+    pub fn stop(self) -> Self {
+        Self { start: None, elapsed: self.elapsed() }
+    }
+
+    pub fn elapsed(self) -> Duration {
+        self.start
+            .map(|start| start.elapsed())
+            .map_or(self.elapsed, |dur| self.elapsed.saturating_add(dur))
+    }
+
+    pub fn toggle(self) -> Self {
+        match self.start {
+            Some(_start) => self.stop(),
+            None         => self.start(),
+        }
+    }
+}
+
+#[test]
+fn test_opt_add() -> Result<(), Box<dyn std::error::Error>> {
+    let v = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    assert_eq!(v.iter().cloned().reduce(std::ops::Add::add), Some(55));
+    Ok(())
 }

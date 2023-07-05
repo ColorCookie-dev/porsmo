@@ -2,17 +2,22 @@ mod prelude;
 mod alert;
 mod format;
 mod input;
-mod notification;
 mod pomodoro;
-mod sound;
 mod stopwatch;
 mod terminal;
 mod timer;
+mod app;
 
-use crate::format::fmt_time;
+use std::time::Duration;
+use app::PorsmoUI;
+use crate::format::{fmt_time, parse_time};
 use crate::prelude::*;
+use crossterm::event::{self, Event};
+use input::Command;
 use pomodoro::PomodoroUI;
-use stopwatch::StopwatchUI;
+use porsmo::pomodoro::PomoConfig;
+use stopwatch::{StopwatchUI, CounterApp};
+use terminal::TerminalHandler;
 use timer::TimerUI;
 use clap::{Parser, Subcommand};
 
@@ -78,74 +83,54 @@ enum PomoMode {
 
 fn main() -> Result<()> {
     let args = Cli::parse();
-    match args.mode {
-        Some(Modes::Stopwatch { start_time }) => StopwatchUI::from_secs(start_time),
-        Some(Modes::Timer { start_time }) => TimerUI::from_secs(start_time),
-        Some(Modes::Pomodoro { mode }) => match mode {
-            Some(PomoMode::Short) | None => PomodoroUI::short(),
-            Some(PomoMode::Long) => PomodoroUI::long(),
-            Some(PomoMode::Custom {work_time, break_time, long_break_time, }) =>
-                PomodoroUI::from_secs(work_time, break_time, long_break_time),
-        },
-        None => PomodoroUI::short(),
+    let pomodoro_short = || PorsmoUI::pomodoro(PomoConfig::short());
+    let pomodoro_long  = || PorsmoUI::pomodoro(PomoConfig::long());
+
+    let mut app = match args.mode {
+        Some(Modes::Stopwatch { start_time }) =>
+            PorsmoUI::stopwatch(Duration::from_secs(start_time)),
+        Some(Modes::Timer { start_time }) =>
+            PorsmoUI::timer(Duration::from_secs(start_time)),
+        Some(Modes::Pomodoro {mode: Some(PomoMode::Short) | None}) =>
+            pomodoro_short(),
+        Some(Modes::Pomodoro {mode: Some(PomoMode::Long)}) =>
+            pomodoro_long(),
+        Some(Modes::Pomodoro {
+            mode: Some(
+                      PomoMode::Custom {
+                          work_time,
+                          break_time,
+                          long_break_time
+                      }
+                  )
+        }) => PorsmoUI::pomodoro(
+                PomoConfig::new(
+                    Duration::from_secs(work_time),
+                    Duration::from_secs(break_time),
+                    Duration::from_secs(long_break_time),
+                )
+            ),
+        None => pomodoro_short(),
+    };
+
+    let mut terminal = TerminalHandler::new()?;
+    while !app.ended() {
+        app.show(&mut terminal)?;
+        // TODO: Move the event handling here and pass commands to UIs
+        match get_event(Duration::from_millis(250))?.map(Command::from) {
+            Some(command) => app = app.handle_command(command),
+            None => (),
+        };
     }
-    .map(|time| {
-        println!("{}", fmt_time(time));
-    })
+
+    Ok(())
 }
 
-fn parse_time(time_str: &str) -> Result<u64> {
-    let mut secs = 0u64;
-
-    for (i, e) in time_str.split(':').rev().enumerate() {
-        if e.is_empty() {
-            continue;
-        }
-
-        let en = e.parse::<u64>()?;
-
-        if i == 0 {
-            secs += en;
-        } else if i == 1 {
-            secs += en * 60;
-        } else if i == 2 {
-            secs += en * 60 * 60;
-        } else if i == 3 {
-            secs += en * 3600 * 24;
-        } else {
-            bail!("Bad number of ':'");
-        }
-    }
-
-    Ok(secs)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_parse_time() -> Result<()> {
-        let ok_cases = vec![
-            ("", 0),
-            (":", 0),
-            ("::10", 10),
-            ("1020", 1020),
-            ("2:000092", 2 * 60 + 92),
-            ("2:", 2 * 60),
-            ("2:2:2", (2 * 60 + 2) * 60 + 2),
-            ("1:::", 1 * 24 * 60 * 60),
-        ];
-
-        for (inp, out) in ok_cases.iter() {
-            assert_eq!(parse_time(inp)?, *out);
-        }
-
-        let err_cases = vec!["1::::", "kjdf:kjfk", ":kjfk", "1:4k:5"];
-
-        for inp in err_cases.iter() {
-            assert!(parse_time(inp).is_err());
-        }
-
-        Ok(())
+pub fn get_event(timeout: Duration) -> Result<Option<event::Event>> {
+    if event::poll(timeout)
+        .with_context(|| "Polling failed")? {
+        Ok(Some(event::read().with_context(|| "Failed to read event")?))
+    } else {
+        Ok(None)
     }
 }
