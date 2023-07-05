@@ -113,7 +113,6 @@ fn main() -> Result<()> {
     let mut terminal = TerminalHandler::new()?;
     while !app.ended() {
         app.show(&mut terminal)?;
-        // TODO: Move the event handling here and pass commands to UIs
         match get_event(Duration::from_millis(250))?.map(Command::from) {
             Some(command) => app = app.handle_command(command),
             None => (),
