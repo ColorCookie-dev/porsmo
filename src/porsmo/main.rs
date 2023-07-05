@@ -22,7 +22,7 @@ use clap::{Parser, Subcommand};
 #[command(
     name = "Porsmo",
     author = "HellsNoah <hellsnoah@protonmail.com>",
-    version = "0.2.0",
+    version = "0.2.2",
     about = "Timer and Stopwatch and Pomodoro",
     long_about = None,
 )]
