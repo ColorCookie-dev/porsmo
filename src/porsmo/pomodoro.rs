@@ -177,7 +177,7 @@ impl PomodoroUI {
             Mode::LongBreak => ("Pomodoro 4 sessions complete!", "Time for a long break"),
         };
 
-        alert(heading.into(), message.into());
+        alert(heading, message);
     }
 }
 

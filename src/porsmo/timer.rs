@@ -8,11 +8,13 @@ use crate::{
 use crate::prelude::*;
 use porsmo::counter::Counter;
 use porsmo::counter::DoubleEndedDuration;
+use std::cell::RefCell;
 use std::time::Duration;
 
 pub struct TimerUI {
     counter: Counter,
     initial: Duration,
+    alerted: RefCell<bool>,
     quit: bool,
 }
 
@@ -21,6 +23,7 @@ impl TimerUI {
         Self {
             counter: Counter::default().start(),
             initial,
+            alerted: RefCell::new(false),
             quit: false,
         }
     }
@@ -60,6 +63,14 @@ impl TimerUI {
                     .flush()?;
             }
             DoubleEndedDuration::Negative(elapsed) => {
+                if !*self.alerted.borrow() {
+                    let title = "The timer has ended!";
+                    let initial = fmt_time(self.initial.clone());
+                    let message = format!("Your Timer of {initial} has ended");
+                    alert(title, message);
+                    self.alerted.replace(true);
+                }
+
                 terminal
                     .clear()?
                     .info("Timer Has Ended")?
