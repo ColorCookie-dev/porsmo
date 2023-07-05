@@ -37,6 +37,10 @@ impl Counter {
         matches!(self.start, None)
     }
 
+    pub fn saturating_time_left(&self, initial: Duration) -> Duration {
+        initial.saturating_sub(self.elapsed())
+    }
+
     pub fn checked_time_left(&self, initial: Duration) -> DoubleEndedDuration {
         match initial.checked_sub(self.elapsed()) {
             Some(x) => DoubleEndedDuration::Positive(x),
