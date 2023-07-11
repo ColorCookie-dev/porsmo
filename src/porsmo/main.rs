@@ -1,4 +1,3 @@
-mod prelude;
 mod alert;
 mod format;
 mod input;
@@ -11,11 +10,10 @@ mod app;
 use std::time::Duration;
 use app::PorsmoUI;
 use crate::format::parse_time;
-use crate::prelude::*;
 use crossterm::event;
 use input::Command;
 use porsmo::pomodoro::PomoConfig;
-use terminal::TerminalHandler;
+use terminal::{TerminalHandler, TerminalError};
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
@@ -28,11 +26,11 @@ use clap::{Parser, Subcommand};
 )]
 struct Cli {
     #[command(subcommand, name = "mode")]
-    mode: Option<Modes>,
+    mode: Option<CounterMode>,
 }
 
 #[derive(Subcommand, Debug)]
-enum Modes {
+enum CounterMode {
     /// alias: s, stopwatch, counts up until you tell it to stop
     #[command(name = "stopwatch", alias = "s")]
     Stopwatch {
@@ -78,21 +76,66 @@ enum PomoMode {
     },
 }
 
-fn main() -> Result<()> {
-    let args = Cli::parse();
-    let pomodoro_short = || PorsmoUI::pomodoro(PomoConfig::short());
-    let pomodoro_long  = || PorsmoUI::pomodoro(PomoConfig::long());
+#[derive(Debug, thiserror::Error)]
+enum Errors {
+    #[error(transparent)]
+    TerminalError(#[from] TerminalError),
 
-    let mut app = match args.mode {
-        Some(Modes::Stopwatch { start_time }) =>
+    #[error(transparent)]
+    InputEventError(#[from] InputEventError),
+}
+
+fn main() -> Result<(), Errors> {
+    let args = Cli::parse();
+    let mut app = get_ui_from_counter_mode(args.mode);
+    let mut terminal = TerminalHandler::new()?;
+
+    while !app.ended() {
+        app.show(&mut terminal)?;
+
+        match get_event(Duration::from_millis(250)) {
+            Ok(command) => app = app.handle_command(Command::from(command)),
+            Err(InputEventError::NoEventsToPoll) => (),
+            Err(e) => return Err(e.into()),
+        };
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum InputEventError {
+    #[error("Polling events failed")]
+    PollFailed(#[source] crossterm::ErrorKind),
+
+    #[error("Reading events failed")]
+    EventReadFailed(#[source] crossterm::ErrorKind),
+
+    #[error("Currently there are no new events")]
+    NoEventsToPoll,
+}
+
+pub fn get_event(timeout: Duration)
+-> Result<event::Event, InputEventError> {
+    if event::poll(timeout)
+        .map_err(|e| InputEventError::PollFailed(e))? {
+        Ok (event::read().map_err(|e| InputEventError::EventReadFailed(e))?)
+    } else {
+        Err(InputEventError::NoEventsToPoll)
+    }
+}
+
+fn get_ui_from_counter_mode(mode: Option<CounterMode>) -> PorsmoUI {
+    match mode {
+        Some(CounterMode::Stopwatch { start_time }) =>
             PorsmoUI::stopwatch(Duration::from_secs(start_time)),
-        Some(Modes::Timer { start_time }) =>
+        Some(CounterMode::Timer { start_time }) =>
             PorsmoUI::timer(Duration::from_secs(start_time)),
-        Some(Modes::Pomodoro {mode: Some(PomoMode::Short) | None}) =>
-            pomodoro_short(),
-        Some(Modes::Pomodoro {mode: Some(PomoMode::Long)}) =>
-            pomodoro_long(),
-        Some(Modes::Pomodoro {
+        Some(CounterMode::Pomodoro {mode: Some(PomoMode::Short) | None}) =>
+            PorsmoUI::pomodoro(PomoConfig::short()),
+        Some(CounterMode::Pomodoro {mode: Some(PomoMode::Long)}) =>
+            PorsmoUI::pomodoro(PomoConfig::long()),
+        Some(CounterMode::Pomodoro {
             mode: Some(
                       PomoMode::Custom {
                           work_time,
@@ -107,26 +150,7 @@ fn main() -> Result<()> {
                     Duration::from_secs(long_break_time),
                 )
             ),
-        None => pomodoro_short(),
-    };
-
-    let mut terminal = TerminalHandler::new()?;
-    while !app.ended() {
-        app.show(&mut terminal)?;
-        match get_event(Duration::from_millis(250))?.map(Command::from) {
-            Some(command) => app = app.handle_command(command),
-            None => (),
-        };
-    }
-
-    Ok(())
-}
-
-pub fn get_event(timeout: Duration) -> Result<Option<event::Event>> {
-    if event::poll(timeout)
-        .with_context(|| "Polling failed")? {
-        Ok(Some(event::read().with_context(|| "Failed to read event")?))
-    } else {
-        Ok(None)
+        None => PorsmoUI::pomodoro(PomoConfig::short()),
     }
 }
+

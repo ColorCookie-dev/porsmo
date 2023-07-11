@@ -1,12 +1,10 @@
 use crate::alert::Alert;
-use crate::terminal::running_color;
+use crate::terminal::{running_color, TerminalError};
 use crate::{
-    alert::alert,
     format::fmt_time,
     input::Command,
     terminal::TerminalHandler,
 };
-use crate::prelude::*;
 use crossterm::style::Color;
 use porsmo::counter::{DoubleEndedDuration, Counter};
 use porsmo::pomodoro::{
@@ -83,7 +81,8 @@ impl PomodoroUI {
         "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume, [Enter]: Next";
     const SKIP_CONTROLS: &str = "[Enter]: Yes, [Q/N]: No";
 
-    pub fn show(&self, terminal: &mut TerminalHandler) -> Result<()> {
+    pub fn show(&self, terminal: &mut TerminalHandler)
+    -> Result<(), TerminalError> {
         if self.skip {
             terminal.clear()?;
             let message = format!("Round: {}", self.session.session());

@@ -1,5 +1,4 @@
-use std::time::Duration;
-use crate::prelude::*;
+use std::{time::Duration, num::ParseIntError};
 
 pub fn fmt_time(time: Duration) -> String {
     let secs = time.as_secs();
@@ -25,7 +24,16 @@ pub fn fmt_time(time: Duration) -> String {
     }
 }
 
-pub fn parse_time(time_str: &str) -> Result<u64> {
+#[derive(Debug, thiserror::Error)]
+pub enum TimeParseError {
+    #[error(transparent)]
+    ParseIntError(#[from] ParseIntError),
+
+    #[error("Bad number of `:`")]
+    BadNumberOfSeparators,
+}
+
+pub fn parse_time(time_str: &str) -> Result<u64, TimeParseError> {
     let mut secs = 0u64;
 
     for (i, e) in time_str.split(':').rev().enumerate() {
@@ -44,7 +52,7 @@ pub fn parse_time(time_str: &str) -> Result<u64> {
         } else if i == 3 {
             secs += en * 3600 * 24;
         } else {
-            bail!("Bad number of ':'");
+            return Err(TimeParseError::BadNumberOfSeparators);
         }
     }
 

@@ -44,7 +44,7 @@ impl Counter {
     pub fn checked_time_left(&self, initial: Duration) -> DoubleEndedDuration {
         match initial.checked_sub(self.elapsed()) {
             Some(x) => DoubleEndedDuration::Positive(x),
-            None => DoubleEndedDuration::Negative(
+            None    => DoubleEndedDuration::Negative(
                 self.elapsed().saturating_sub(initial)
             ),
         }
@@ -69,8 +69,8 @@ impl Counter {
 
     pub fn toggle(self) -> Self {
         match self.start {
-            Some(_start) => self.stop(),
-            None         => self.start(),
+            Some(_) => self.stop(),
+            None    => self.start(),
         }
     }
 }

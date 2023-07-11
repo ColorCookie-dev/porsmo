@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use rodio::{Decoder, OutputStream, Sink};
 use std::{io::Cursor, thread, cell::RefCell};
 use notify_rust::Notification;
@@ -32,13 +31,22 @@ impl Alert {
     }
 }
 
-pub fn notify_default(title: impl AsRef<str>, message: impl AsRef<str>) -> Result<()> {
+#[derive(Debug, thiserror::Error)]
+pub enum AlertError {
+    #[error("Failed to show notification")]
+    FailedToNotify(#[from] notify_rust::error::Error),
+
+    #[error(transparent)]
+    SoundError(#[from] SoundError),
+}
+
+pub fn notify_default(title: impl AsRef<str>, message: impl AsRef<str>)
+-> Result<(), AlertError> {
     Notification::new()
         .appname("Porsmo")
         .summary(title.as_ref())
         .body(message.as_ref())
-        .show()
-        .with_context(|| "Failed to show notification")?;
+        .show()?;
     Ok(())
 }
 pub fn alert(title: impl Into<String>, message: impl Into<String>) {
@@ -50,9 +58,33 @@ pub fn alert(title: impl Into<String>, message: impl Into<String>) {
     });
 }
 
-pub fn play_bell() -> Result<()> {
+#[derive(Debug, thiserror::Error)]
+pub enum SoundError {
+    #[error(transparent)]
+    StreamError(#[from] rodio::StreamError),
+
+    #[error(transparent)]
+    DevicesError(#[from] rodio::DevicesError),
+
+    #[error(transparent)]
+    DecoderError(#[from] rodio::decoder::DecoderError),
+
+    #[error("No devices found")]
+    NoDevice,
+}
+
+impl From<rodio::PlayError> for SoundError {
+    fn from(err: rodio::PlayError) -> Self {
+        match err {
+            rodio::PlayError::NoDevice => Self::NoDevice,
+            rodio::PlayError::DecoderError(e) => Self::DecoderError(e),
+        }
+    }
+}
+
+pub fn play_bell() -> Result<(), SoundError> {
     let (_stream, stream_handle) =
-        OutputStream::try_default().with_context(|| "failed to create an audio output stream")?;
+        OutputStream::try_default()?;
 
     // let volume = 0.5;
     let audio = Decoder::new(Cursor::new(include_bytes!("notify_end.wav")))?;
@@ -61,6 +93,7 @@ pub fn play_bell() -> Result<()> {
             sink.append(audio);
             // sink.set_volume(volume);
             sink.sleep_until_end();
-        })
-        .map_err(|_| anyhow!("failed to create a sink"))
+        })?;
+
+    Ok(())
 }

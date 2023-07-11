@@ -15,7 +15,7 @@ impl Default for PomoConfig {
 
 impl PomoConfig {
     pub fn new(
-        work_time: Duration,
+        work_time:  Duration,
         break_time: Duration,
         long_break: Duration,
     ) -> Self {
@@ -28,7 +28,7 @@ impl PomoConfig {
 
     pub fn short() -> Self {
         Self {
-            work_time: Duration::from_secs(25 * 60),
+            work_time:  Duration::from_secs(25 * 60),
             break_time: Duration::from_secs(5 * 60),
             long_break: Duration::from_secs(10 * 60),
         }
@@ -36,7 +36,7 @@ impl PomoConfig {
 
     pub fn long() -> Self {
         Self {
-            work_time: Duration::from_secs(55 * 60),
+            work_time:  Duration::from_secs(55 * 60),
             break_time: Duration::from_secs(10 * 60),
             long_break: Duration::from_secs(20 * 60),
         }

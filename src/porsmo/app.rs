@@ -2,12 +2,11 @@ use std::time::Duration;
 use porsmo::pomodoro::PomoConfig;
 
 use crate::{
-    prelude::*,
-	input::Command,
-	pomodoro::PomodoroUI,
-	stopwatch::{StopwatchUI, CounterApp},
-	terminal::TerminalHandler,
-	timer::TimerUI,
+    input::Command,
+    pomodoro::PomodoroUI,
+    stopwatch::StopwatchUI,
+    terminal::{TerminalHandler, TerminalError},
+    timer::TimerUI,
 };
 
 pub enum PorsmoUI {
@@ -25,7 +24,8 @@ impl PorsmoUI {
         }
     }
 
-    pub fn show(&self, terminal: &mut TerminalHandler) -> Result<()> {
+    pub fn show(&self, terminal: &mut TerminalHandler)
+    -> Result<(), TerminalError> {
         match self {
             Self::Stopwatch(st) => st.show(terminal),
             Self::Timer(timer) => timer.show(terminal),

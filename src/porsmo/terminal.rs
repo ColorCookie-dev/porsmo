@@ -1,4 +1,3 @@
-use anyhow::{Context, Result};
 use std::{
     fmt::Display,
     io::{stdout, Write, Stdout},
@@ -17,17 +16,42 @@ use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
 };
 
+#[derive(thiserror::Error, Debug)]
+pub enum TerminalError {
+    #[error("Error entering raw mode in terminal")]
+    FailedRawModeEnter(#[source] crossterm::ErrorKind),
+
+    #[error("Error initializing terminal with alternate screen and mouse capture")]
+    FailedInitialization(#[source] crossterm::ErrorKind),
+
+    #[error("Error clearing terminal")]
+    FailedClear(#[source] crossterm::ErrorKind),
+
+    #[error("Failed to flush to terminal")]
+    FailedFlush(#[source] std::io::Error),
+
+    #[error("Failed to set foreground color to {1:?}")]
+    ForegroundColorSetFailed(#[source] crossterm::ErrorKind, Color),
+
+    #[error("Failed to print to screen")]
+    FailedPrint(#[source] crossterm::ErrorKind),
+}
+
+pub type Result<T> = core::result::Result<T, TerminalError>;
+
 pub struct TerminalHandler(pub Stdout);
 
 impl TerminalHandler {
     pub fn new() -> Result<Self> {
-        enable_raw_mode().with_context(|| "Unable to enter raw mode")?;
+        enable_raw_mode()
+            .map_err(|e| TerminalError::FailedRawModeEnter(e))?;
+
         let mut stdout = std::io::stdout();
         execute!(
             &mut stdout,
             EnterAlternateScreen, EnableMouseCapture,
             Clear(ClearType::All), MoveTo(0, 0),
-        ).with_context(|| "Unable to write to terminal")?;
+        ).map_err(|e| TerminalError::FailedInitialization(e))?;
 
         Ok(Self(stdout))
     }
@@ -42,9 +66,9 @@ impl TerminalHandler {
             stdout,
             MoveTo(0, 0), Clear(ClearType::All),
         )
-        .with_context(|| "failed to clear the terminal")?;
+        .map_err(|e| TerminalError::FailedClear(e))?;
 
-        stdout.flush().with_context(|| "failed to flush stdout")?;
+        stdout.flush().map_err(|e| TerminalError::FailedFlush(e))?;
         Ok(self)
     }
 
@@ -52,7 +76,7 @@ impl TerminalHandler {
         execute!(
             self.stdout(),
             SetForegroundColor(color),
-        ).with_context(|| "failed to set foreground color to: {color:?}")?;
+        ).map_err(|e| TerminalError::ForegroundColorSetFailed(e, color))?;
         Ok(self)
     }
 
@@ -60,7 +84,7 @@ impl TerminalHandler {
         execute!(
             self.stdout(),
             Print(text), MoveToNextLine(1),
-        ).with_context(|| format!("showing info failed"))?;
+        ).map_err(|e| TerminalError::FailedPrint(e))?;
         Ok(self)
     }
 
@@ -77,7 +101,7 @@ impl TerminalHandler {
     }
 
     pub fn flush(&mut self) -> Result<()> {
-        self.stdout().flush().with_context(|| "failed to flush stdout")
+        self.stdout().flush().map_err(|e| TerminalError::FailedFlush(e))
     }
 }
 
