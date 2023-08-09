@@ -1,4 +1,4 @@
-use crossterm::event::{ KeyCode, KeyEvent, KeyModifiers, Event};
+use crossterm::event::{ KeyCode, KeyEvent, KeyModifiers, Event, KeyEventKind};
 
 pub enum Command {
     Quit,
@@ -26,6 +26,7 @@ impl From<KeyEvent> for Command {
         match key {
             KeyEvent {
                 code: KeyCode::Char('q'),
+                kind: KeyEventKind::Press,
                 modifiers: KeyModifiers::NONE, ..
             } => Self::Quit,
             KeyEvent {
@@ -38,10 +39,12 @@ impl From<KeyEvent> for Command {
             } => Self::Quit,
             KeyEvent {
                 code: KeyCode::Char(' '),
+                kind: KeyEventKind::Press,
                 modifiers: KeyModifiers::NONE, ..
             } => Self::Toggle,
             KeyEvent {
                 code: KeyCode::Enter,
+                kind: KeyEventKind::Press,
                 modifiers: KeyModifiers::NONE, ..
             } => Self::Enter,
             KeyEvent {
@@ -58,6 +61,7 @@ impl From<KeyEvent> for Command {
             } => Self::No,
             KeyEvent {
                 code: KeyCode::Char('t'),
+                kind: KeyEventKind::Press,
                 modifiers: KeyModifiers::NONE, ..
             } => Self::Toggle,
             KeyEvent {
