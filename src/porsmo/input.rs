@@ -31,10 +31,12 @@ impl From<KeyEvent> for Command {
             } => Self::Quit,
             KeyEvent {
                 code: KeyCode::Char('c'),
+                kind: KeyEventKind::Press,
                 modifiers: KeyModifiers::CONTROL, ..
             } => Self::Quit,
             KeyEvent {
                 code: KeyCode::Char('z'),
+                kind: KeyEventKind::Press,
                 modifiers: KeyModifiers::CONTROL, ..
             } => Self::Quit,
             KeyEvent {
@@ -49,14 +51,17 @@ impl From<KeyEvent> for Command {
             } => Self::Enter,
             KeyEvent {
                 code: KeyCode::Char('S'),
+                kind: KeyEventKind::Press,
                 modifiers: KeyModifiers::SHIFT, ..
             } => Self::Skip,
             KeyEvent {
                 code: KeyCode::Char('y'),
+                kind: KeyEventKind::Press,
                 modifiers: KeyModifiers::NONE, ..
             } => Self::Yes,
             KeyEvent {
                 code: KeyCode::Char('n'),
+                kind: KeyEventKind::Press,
                 modifiers: KeyModifiers::NONE, ..
             } => Self::No,
             KeyEvent {
@@ -66,10 +71,12 @@ impl From<KeyEvent> for Command {
             } => Self::Toggle,
             KeyEvent {
                 code: KeyCode::Char('p'),
+                kind: KeyEventKind::Press,
                 modifiers: KeyModifiers::NONE, ..
             } => Self::Pause,
             KeyEvent {
                 code: KeyCode::Char('c'),
+                kind: KeyEventKind::Press,
                 modifiers: KeyModifiers::NONE, ..
             } => Self::Resume,
             _ => Self::Invalid,
