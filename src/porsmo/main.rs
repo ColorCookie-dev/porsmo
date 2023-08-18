@@ -85,6 +85,18 @@ enum Errors {
     InputEventError(#[from] InputEventError),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum InputEventError {
+    #[error("Polling events failed")]
+    PollFailed(#[source] crossterm::ErrorKind),
+
+    #[error("Reading events failed")]
+    EventReadFailed(#[source] crossterm::ErrorKind),
+
+    #[error("Currently there are no new events")]
+    NoEventsToPoll,
+}
+
 fn main() -> Result<(), Errors> {
     let args = Cli::parse();
     let mut app = get_ui_from_counter_mode(args.mode);
@@ -101,18 +113,6 @@ fn main() -> Result<(), Errors> {
     }
 
     Ok(())
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum InputEventError {
-    #[error("Polling events failed")]
-    PollFailed(#[source] crossterm::ErrorKind),
-
-    #[error("Reading events failed")]
-    EventReadFailed(#[source] crossterm::ErrorKind),
-
-    #[error("Currently there are no new events")]
-    NoEventsToPoll,
 }
 
 pub fn get_event(timeout: Duration)

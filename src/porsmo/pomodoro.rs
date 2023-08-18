@@ -53,11 +53,11 @@ impl PomodoroUI {
         self.counter
             .saturating_time_left(self.session
                                       .mode()
-                                      .initial(self.config))
+                                      .get_time(self.config))
     }
 
     pub fn excess_time_left(&self) -> DoubleEndedDuration {
-        self.counter.checked_time_left(self.session.mode().initial(self.config))
+        self.counter.checked_time_left(self.session.mode().get_time(self.config))
     }
 
     pub fn quit(self) -> Self {
