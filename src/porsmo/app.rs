@@ -1,16 +1,16 @@
 use std::time::Duration;
 use porsmo::pomodoro::PomoConfig;
 
+use crate::prelude::*;
 use crate::{
+    TIMEOUT,
     input::Command,
     pomodoro::PomodoroUI,
-    stopwatch::StopwatchUI,
-    terminal::{TerminalHandler, TerminalError},
-    timer::TimerUI,
+    terminal::TerminalHandler,
+    timer::TimerUI, get_event, prelude::PorsmoError,
 };
 
 pub enum PorsmoUI {
-    Stopwatch(StopwatchUI),
     Timer(TimerUI),
     Pomodoro(PomodoroUI),
 }
@@ -19,15 +19,26 @@ impl PorsmoUI {
     pub fn handle_command(self, command: Command) -> Self {
         match self {
             Self::Timer(timer) => Self::Timer(timer.handle_command(command)),
-            Self::Stopwatch(st) => Self::Stopwatch(st.handle_command(command)),
             Self::Pomodoro(pomo) => Self::Pomodoro(pomo.handle_command(command)),
         }
     }
 
-    pub fn show(&self, terminal: &mut TerminalHandler)
-    -> Result<(), TerminalError> {
+    pub fn run_loop(mut self, terminal: &mut TerminalHandler) -> Result<()> {
+        while !self.ended() {
+            self.show(terminal)?;
+
+            match get_event(TIMEOUT) {
+                Ok(command) => self = self.handle_command(Command::from(command)),
+                Err(PorsmoError::NoEventsToPoll) => (),
+                Err(e) => return Err(e.into()),
+            };
+        }
+
+        Ok(())
+    }
+
+    pub fn show(&self, terminal: &mut TerminalHandler) -> Result<()> {
         match self {
-            Self::Stopwatch(st) => st.show(terminal),
             Self::Timer(timer) => timer.show(terminal),
             Self::Pomodoro(pomo) => pomo.show(terminal),
         }
@@ -35,14 +46,9 @@ impl PorsmoUI {
 
     pub fn ended(&self) -> bool {
         match self {
-            Self::Stopwatch(st) => st.ended(),
             Self::Timer(timer) => timer.ended(),
             Self::Pomodoro(pomo) => pomo.ended(),
         }
-    }
-
-    pub fn stopwatch(initial: Duration) -> Self {
-        PorsmoUI::Stopwatch(StopwatchUI::new(initial))
     }
 
     pub fn timer(initial: Duration) -> Self {

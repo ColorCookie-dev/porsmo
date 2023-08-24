@@ -1,12 +1,14 @@
+use crate::input::{TIMEOUT, get_event};
+use crate::prelude::*;
 use crate::alert::Alert;
-use crate::terminal::{running_color, TerminalError};
+use crate::terminal::running_color;
 use crate::{
     format::fmt_time,
     input::Command,
     terminal::TerminalHandler,
 };
 use crossterm::style::Color;
-use porsmo::counter::{DoubleEndedDuration, Counter};
+use porsmo::counter::Counter;
 use porsmo::pomodoro::{
     PomodoroMode as Mode,
     PomoConfig,
@@ -15,65 +17,208 @@ use porsmo::pomodoro::{
 
 use std::time::Duration;
 
-pub struct PomodoroUI {
-    counter: Counter,
-    config: PomoConfig,
-    session: Session,
-    quit: bool,
-    skip: bool,
-    alert: Alert,
+#[derive(Debug, Default)]
+pub struct PomoState {
+    pub mode:    PomoStateMode,
+    pub session: Session,
+    pub config:  PomoConfig,
 }
 
-impl PomodoroUI {
-    pub fn new(config: PomoConfig) -> Self {
-        Self {
-            counter: Counter::default().start(),
-            session: Session::default(),
-            alert: Alert::default(),
-            config,
-            quit: false,
-            skip: false,
+#[derive(Debug)]
+pub enum PomoStateMode {
+    Skip {
+        elapsed: Duration,
+    },
+
+    Running {
+        counter: Counter,
+    }
+}
+
+impl Default for PomoStateMode {
+    fn default() -> Self {
+        let counter = Counter::default().start();
+        PomoStateMode::Running { counter }
+    }
+}
+
+impl PomoState {
+    pub fn default_with_config(config: PomoConfig) -> Self {
+        Self { config, ..Default::default() }
+    }
+
+    pub fn handle_command(self, command: Command,) -> Option<Self> {
+        match command {
+            Command::Quit => match self.mode {
+                PomoStateMode::Skip { elapsed } => {
+                    let counter = Counter::from(elapsed).start();
+                    let mode = PomoStateMode::Running { counter };
+                    Some(Self { mode, ..self })
+                },
+                _ => None,
+            },
+
+            Command::No => match self.mode {
+                PomoStateMode::Skip { elapsed } => {
+                    let counter = Counter::from(elapsed).start();
+                    let mode = PomoStateMode::Running { counter };
+                    Some(Self { mode, ..self })
+                },
+                _ => Some(self),
+            },
+
+            Command::Enter => match self.mode {
+                PomoStateMode::Running { counter }
+                if counter.elapsed() < self.session.mode.get_time(&self.config)
+                    => {
+                    let counter = Counter::default().start();
+                    let mode = PomoStateMode::Running { counter };
+                    let session = self.session.next();
+                    Some(Self { mode, session, ..self })
+                }
+                PomoStateMode::Skip { .. } => {
+                    let counter = Counter::default().start();
+                    let mode = PomoStateMode::Running { counter };
+                    let session = self.session.next();
+                    Some(PomoState{ mode, session, ..self })
+                },
+                _ => Some(self),
+            },
+
+            Command::Yes => match self.mode {
+                PomoStateMode::Skip { .. } => {
+                    let counter = Counter::default().start();
+                    let mode = PomoStateMode::Running { counter };
+                    let session = self.session.next();
+                    Some(Self { mode, session, ..self })
+                },
+                _ => Some(self),
+            },
+
+            Command::Pause => match self.mode {
+                PomoStateMode::Running { counter } => {
+                    let counter = counter.stop();
+                    let mode = PomoStateMode::Running { counter };
+                    Some(Self { mode, ..self })
+                },
+                _ => Some(self),
+            }
+
+            Command::Resume => match self.mode {
+                PomoStateMode::Running { counter } => {
+                    let counter = counter.start();
+                    let mode = PomoStateMode::Running { counter };
+                    Some(Self { mode, ..self })
+                },
+                _ => Some(self),
+            }
+
+            Command::Toggle => match self.mode {
+                PomoStateMode::Running { counter } => {
+                    let counter = counter.toggle();
+                    let mode = PomoStateMode::Running { counter };
+                    Some(Self { mode, ..self })
+                },
+                _ => Some(self),
+            }
+
+            Command::Skip => match self.mode {
+                PomoStateMode::Running { counter } => {
+                    let elapsed = counter.elapsed();
+                    let mode = PomoStateMode::Skip { elapsed };
+                    Some(PomoState { mode, ..self })
+                },
+                _ => Some(self),
+            }
+
+            _ => Some(self),
         }
     }
 
-    pub fn from_secs(work_time: u64, break_time: u64, long_break: u64)
-    -> Self {
-        Self::new(PomoConfig {
-            work_time: Duration::from_secs(work_time),
-            break_time: Duration::from_secs(break_time),
-            long_break: Duration::from_secs(long_break),
-        })
-    }
-
-    pub fn ended(&self) -> bool {
-        self.quit
-    }
-
-    pub fn time_left(&self) -> Duration {
-        self.counter
-            .saturating_time_left(self.session
-                                      .mode()
-                                      .get_time(self.config))
-    }
-
-    pub fn excess_time_left(&self) -> DoubleEndedDuration {
-        self.counter.checked_time_left(self.session.mode().get_time(self.config))
-    }
-
-    pub fn quit(self) -> Self {
-        Self { counter: self.counter.stop(), quit: true, ..self }
-    }
-
-    pub fn next_mode(self) -> Self {
-        Self {
-            counter: Counter::default().start(),
-            session: self.session.next(),
-            ..self
+    fn title(mode: Mode) -> &'static str {
+        match mode {
+            Mode::Work => "Pomodoro (Work)",
+            Mode::Break => "Pomodoro (Break)",
+            Mode::LongBreak => "Pomodor (Long Break)",
         }
     }
 
-    pub fn check_next_mode(&self) -> Mode {
-        self.session.next().mode()
+    fn break_title(next_mode: Mode) -> &'static str {
+        match next_mode {
+            Mode::Work => "Break has ended! Start work?",
+            Mode::Break => "Work has ended! Start break?",
+            Mode::LongBreak => "Work has ended! Start a long break",
+        }
+    }
+
+    pub fn show(
+        &self,
+        terminal: &mut TerminalHandler,
+    ) -> Result<()> {
+        let target = self.session.mode.get_time(&self.config);
+        let round_number = format!("Round: {}", self.session.number);
+        match self.mode {
+            PomoStateMode::Skip { .. } => {
+                let (color, skip_to) = match self.session.next().mode {
+                    Mode::Work => (Color::Red, "skip to work?"),
+                    Mode::Break => (Color::Green, "skip to break?"),
+                    Mode::LongBreak => (Color::Green, "skip to long break?"),
+                };
+                terminal
+                    .clear()?
+                    .set_foreground_color(color)?
+                    .print(skip_to)?
+                    .info(round_number)?
+                    .info(Self::SKIP_CONTROLS)?
+                    .flush()?;
+            },
+            PomoStateMode::Running { counter } if counter.elapsed() < target => {
+                let time_left = target.saturating_sub(counter.elapsed());
+
+                terminal
+                    .clear()?
+                    .info(Self::title(self.session.mode))?
+                    .set_foreground_color(running_color(counter.started()))?
+                    .print(fmt_time(time_left))?
+                    .info(Self::CONTROLS)?
+                    .status(round_number)?
+                    .flush()?;
+            },
+            PomoStateMode::Running { counter } => {
+                let excess_time = counter.elapsed().saturating_sub(target);
+                let (title, message) = Self::pomodoro_alert_message(
+                    self.session.next().mode
+                );
+                // TODO: Alert
+
+                terminal
+                    .clear()?
+                    .info(Self::break_title(self.session.next().mode))?
+                    .set_foreground_color(running_color(counter.started()))?
+                    .print(format_args!("+{}", fmt_time(excess_time)))?
+                    .info(Self::ENDING_CONTROLS)?
+                    .status(message)?
+                    .flush()?;
+            },
+        }
+        Ok(())
+    }
+
+    pub fn run(
+        terminal: &mut TerminalHandler,
+        config: PomoConfig
+    ) -> Result<()> {
+        let mut state = Self::default_with_config(config);
+
+        loop {
+            state.show(terminal)?;
+            if let Some(cmd) = get_event(TIMEOUT)?.map(Command::from) {
+                match state.handle_command(cmd) {
+                    Some(new_state) => state = new_state,
+                    None => return Ok(()),
+                }
+            }
+        }
     }
 
     const CONTROLS: &str = "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume";
@@ -81,129 +226,13 @@ impl PomodoroUI {
         "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume, [Enter]: Next";
     const SKIP_CONTROLS: &str = "[Enter]: Yes, [Q/N]: No";
 
-    pub fn show(&self, terminal: &mut TerminalHandler)
-    -> Result<(), TerminalError> {
-        if self.skip {
-            terminal.clear()?;
-            let message = format!("Round: {}", self.session.session());
-            match self.check_next_mode() {
-                Mode::Work =>
-                    terminal
-                        .set_foreground_color(Color::Red)?
-                        .print("skip to work?")?
-                        .info(message)?
-                        .info(Self::SKIP_CONTROLS)?
-                        .flush()?,
-                Mode::Break =>
-                    terminal
-                        .set_foreground_color(Color::Green)?
-                        .print("skip to break?")?
-                        .info(message)?
-                        .info(Self::SKIP_CONTROLS)?
-                        .flush()?,
-                Mode::LongBreak =>
-                    terminal
-                        .set_foreground_color(Color::Green)?
-                        .print("skip to long break?")?
-                        .info(message)?
-                        .info(Self::SKIP_CONTROLS)?
-                        .flush()?,
-            };
-            return Ok(())
-        }
-
-        match self.excess_time_left() {
-            DoubleEndedDuration::Positive(elapsed) => {
-                self.alert.reset();
-
-                let title = match self.session.mode() {
-                    Mode::Work => "Pomodoro (Work)",
-                    Mode::Break => "Pomodoro (Break)",
-                    Mode::LongBreak => "Pomodor (Long Break)",
-                };
-
-                terminal
-                    .clear()?
-                    .info(title)?
-                    .set_foreground_color(running_color(self.counter.started()))?
-                    .print(fmt_time(elapsed))?
-                    .info(Self::CONTROLS)?
-                    .status(format_args!("Round: {}", self.session.session()))?
-                    .flush()?;
-            }
-            DoubleEndedDuration::Negative(elapsed) => {
-                let (title, message) = Self::pomodoro_alert_message(
-                    self.check_next_mode()
-                );
-                self.alert.alert(title, message);
-
-                let title = match self.check_next_mode() {
-                    Mode::Work => "Break has ended! Start work?",
-                    Mode::Break => "Work has ended! Start break?",
-                    Mode::LongBreak => "Work has ended! Start a long break",
-                };
-
-                terminal
-                    .clear()?
-                    .info(title)?
-                    .set_foreground_color(running_color(self.counter.started()))?
-                    .print(format_args!("+{}", fmt_time(elapsed)))?
-                    .info(Self::ENDING_CONTROLS)?
-                    .status(format!("Round: {}", self.session.session()))?
-                    .flush()?;
-            }
-        }
-        Ok(())
-    }
-
-    pub fn start_skip(self) -> Self {
-        Self { counter: self.counter.stop(), skip: true, ..self }
-    }
-
-    pub fn cancel_skip(self) -> Self {
-        Self { skip: false, ..self }
-    }
-
-    pub fn handle_command(mut self, command: Command) -> Self {
-        match command {
-            Command::Quit | Command::No if self.skip =>
-                return self.cancel_skip(),
-
-            Command::Enter | Command::Yes if self.skip =>
-                return self.cancel_skip().next_mode(),
-
-            Command::Enter if self.time_left().is_zero() =>
-                return self.next_mode(),
-
-            Command::Quit =>
-                return self.quit(),
-
-            Command::Pause =>
-                self.counter = self.counter.stop(),
-
-            Command::Resume =>
-                self.counter = self.counter.start(),
-
-            Command::Toggle =>
-                self.counter = self.counter.toggle(),
-
-            Command::Skip =>
-                return self.start_skip(),
-
-            _ => (),
-        };
-        self
-    }
-
-    pub fn pomodoro_alert_message(next_mode: Mode) -> (String, String) {
-        let (heading, message) = match next_mode {
+    pub fn pomodoro_alert_message(
+        next_mode: Mode
+    ) -> (&'static str, &'static str) {
+        match next_mode {
             Mode::Work => ("Your break ended!", "Time for some work"),
             Mode::Break => ("Pomodoro ended!", "Time for a short break"),
             Mode::LongBreak => ("Pomodoro 4 sessions complete!", "Time for a long break"),
-        };
-
-        (heading.into(), message.into())
+        }
     }
 }
-
-

@@ -1,4 +1,7 @@
-use crossterm::event::{ KeyCode, KeyEvent, KeyModifiers, Event, KeyEventKind};
+use crate::prelude::*;
+use std::time::Duration;
+
+use crossterm::event::{ KeyCode, KeyEvent, KeyModifiers, Event, KeyEventKind, self};
 
 pub enum Command {
     Quit,
@@ -83,3 +86,24 @@ impl From<KeyEvent> for Command {
         }
     }
 }
+
+pub struct CommandIter;
+
+impl Iterator for CommandIter {
+    type Item = Result<Command>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(get_event(TIMEOUT).transpose()?.map(Command::from))
+    }
+}
+
+pub const TIMEOUT: Duration = Duration::from_millis(250);
+
+pub fn get_event(timeout: Duration) -> Result<Option<event::Event>> {
+    if event::poll(timeout)? {
+        Ok (Some (event::read()?))
+    } else {
+        Ok (None)
+    }
+}
+
