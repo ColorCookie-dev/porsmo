@@ -1,5 +1,5 @@
 use crate::input::{TIMEOUT, get_event};
-use crate::prelude::*;
+use crate::{prelude::*, CounterUIState};
 use crate::alert::Alert;
 use crate::terminal::running_color;
 use crate::{
@@ -42,12 +42,63 @@ impl Default for PomoStateMode {
     }
 }
 
+impl From<PomoConfig> for PomoState {
+    fn from(config: PomoConfig) -> Self {
+        Self { config, ..Default::default() }
+    }
+}
+
 impl PomoState {
-    pub fn default_with_config(config: PomoConfig) -> Self {
+    pub fn new(
+        mode: PomoStateMode,
+        session: Session,
+        config: PomoConfig,
+    ) -> Self {
+        Self {
+            mode,
+            session,
+            config,
+        }
+    }
+
+    fn default_with_config(config: PomoConfig) -> Self {
         Self { config, ..Default::default() }
     }
 
-    pub fn handle_command(self, command: Command,) -> Option<Self> {
+    fn title(mode: Mode) -> &'static str {
+        match mode {
+            Mode::Work => "Pomodoro (Work)",
+            Mode::Break => "Pomodoro (Break)",
+            Mode::LongBreak => "Pomodor (Long Break)",
+        }
+    }
+
+    fn break_title(next_mode: Mode) -> &'static str {
+        match next_mode {
+            Mode::Work => "Break has ended! Start work?",
+            Mode::Break => "Work has ended! Start break?",
+            Mode::LongBreak => "Work has ended! Start a long break",
+        }
+    }
+
+    const CONTROLS: &str = "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume";
+    const ENDING_CONTROLS: &str =
+        "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume, [Enter]: Next";
+    const SKIP_CONTROLS: &str = "[Enter]: Yes, [Q/N]: No";
+
+    pub fn pomodoro_alert_message(
+        next_mode: Mode
+    ) -> (&'static str, &'static str) {
+        match next_mode {
+            Mode::Work => ("Your break ended!", "Time for some work"),
+            Mode::Break => ("Pomodoro ended!", "Time for a short break"),
+            Mode::LongBreak => ("Pomodoro 4 sessions complete!", "Time for a long break"),
+        }
+    }
+}
+
+impl CounterUIState for PomoState {
+    fn handle_command(self, command: Command,) -> Option<Self> {
         match command {
             Command::Quit => match self.mode {
                 PomoStateMode::Skip { elapsed } => {
@@ -135,23 +186,7 @@ impl PomoState {
         }
     }
 
-    fn title(mode: Mode) -> &'static str {
-        match mode {
-            Mode::Work => "Pomodoro (Work)",
-            Mode::Break => "Pomodoro (Break)",
-            Mode::LongBreak => "Pomodor (Long Break)",
-        }
-    }
-
-    fn break_title(next_mode: Mode) -> &'static str {
-        match next_mode {
-            Mode::Work => "Break has ended! Start work?",
-            Mode::Break => "Work has ended! Start break?",
-            Mode::LongBreak => "Work has ended! Start a long break",
-        }
-    }
-
-    pub fn show(
+    fn show(
         &self,
         terminal: &mut TerminalHandler,
     ) -> Result<()> {
@@ -179,7 +214,7 @@ impl PomoState {
                     .clear()?
                     .info(Self::title(self.session.mode))?
                     .set_foreground_color(running_color(counter.started()))?
-                    .print(fmt_time(time_left))?
+                    .print(fmt_time(time_left.as_secs()))?
                     .info(Self::CONTROLS)?
                     .status(round_number)?
                     .flush()?;
@@ -195,44 +230,12 @@ impl PomoState {
                     .clear()?
                     .info(Self::break_title(self.session.next().mode))?
                     .set_foreground_color(running_color(counter.started()))?
-                    .print(format_args!("+{}", fmt_time(excess_time)))?
+                    .print(format_args!("+{}", fmt_time(excess_time.as_secs())))?
                     .info(Self::ENDING_CONTROLS)?
                     .status(message)?
                     .flush()?;
             },
         }
         Ok(())
-    }
-
-    pub fn run(
-        terminal: &mut TerminalHandler,
-        config: PomoConfig
-    ) -> Result<()> {
-        let mut state = Self::default_with_config(config);
-
-        loop {
-            state.show(terminal)?;
-            if let Some(cmd) = get_event(TIMEOUT)?.map(Command::from) {
-                match state.handle_command(cmd) {
-                    Some(new_state) => state = new_state,
-                    None => return Ok(()),
-                }
-            }
-        }
-    }
-
-    const CONTROLS: &str = "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume";
-    const ENDING_CONTROLS: &str =
-        "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume, [Enter]: Next";
-    const SKIP_CONTROLS: &str = "[Enter]: Yes, [Q/N]: No";
-
-    pub fn pomodoro_alert_message(
-        next_mode: Mode
-    ) -> (&'static str, &'static str) {
-        match next_mode {
-            Mode::Work => ("Your break ended!", "Time for some work"),
-            Mode::Break => ("Pomodoro ended!", "Time for a short break"),
-            Mode::LongBreak => ("Pomodoro 4 sessions complete!", "Time for a long break"),
-        }
     }
 }

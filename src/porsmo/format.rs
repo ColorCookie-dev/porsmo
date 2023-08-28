@@ -1,26 +1,27 @@
-use std::{time::Duration, num::ParseIntError};
+use std::num::ParseIntError;
 
-pub fn fmt_time(time: Duration) -> String {
-    let secs = time.as_secs();
-    if secs < 60 {
-        format!("00:{:0>2}", secs)
-    } else if secs < 3600 {
-        format!("{:0>2}:{:0>2}", secs / 60, secs % 60)
-    } else if secs < 86_400 {
-        format!(
-            "{:0>2}:{:0>2}:{:0>2}",
-            secs / 3600,
-            secs / 60 % 60,
-            secs % 60
-        )
-    } else {
-        format!(
-            "{}days {:0>2}:{:0>2}:{:0>2}",
-            secs / 86_400,
-            secs / 3600 % 24,
-            secs / 60 % 60,
-            secs % 60
-        )
+pub fn fmt_time(time: u64) -> String {
+    const MIN: u64 = 60;
+    const HOUR: u64 = 60 * MIN;
+    const DAY: u64 = 24 * HOUR;
+
+    match time {
+        secs if secs < MIN => format!("{secs}s"),
+        secs if secs < HOUR => format!(
+            "{}m {}",
+            secs.div_euclid(MIN),
+            fmt_time(secs.rem_euclid(MIN))
+        ),
+        secs if secs < DAY => format!(
+            "{}h {}",
+            secs.div_euclid(HOUR),
+            fmt_time(secs.rem_euclid(HOUR))
+        ),
+        secs => format!(
+            "{}days {}",
+            secs.div_euclid(DAY),
+            fmt_time(secs.rem_euclid(DAY))
+        ),
     }
 }
 
@@ -63,7 +64,7 @@ pub fn parse_time(time_str: &str) -> Result<u64, TimeParseError> {
 mod tests {
     use super::*;
     #[test]
-    fn test_parse_time() -> Result<()> {
+    fn test_parse_time() -> Result<(), TimeParseError> {
         let ok_cases = vec![
             ("", 0),
             (":", 0),

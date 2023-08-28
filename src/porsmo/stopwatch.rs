@@ -1,8 +1,7 @@
-use std::ops::ControlFlow;
 use std::time::Duration;
 
-use crate::input::{CommandIter, get_event, TIMEOUT};
-use crate::prelude::*;
+use crate::input::{get_event, TIMEOUT};
+use crate::{prelude::*, CounterUIState};
 use crate::terminal::running_color;
 use crate::{
     format::fmt_time,
@@ -17,7 +16,14 @@ pub struct StopwatchState {
 }
 
 impl StopwatchState {
-    pub fn show(
+    pub fn new(start_time: Duration) -> Self {
+        let counter = Stopwatch::from(start_time).start();
+        Self { counter }
+    }
+}
+
+impl CounterUIState for StopwatchState {
+    fn show(
         &self,
         terminal: &mut TerminalHandler,
     ) -> Result<()> {
@@ -25,37 +31,21 @@ impl StopwatchState {
             .clear()?
             .info("Stopwatch")?
             .set_foreground_color(running_color(self.counter.started()))?
-            .print(fmt_time(self.counter.elapsed()))?
+            .print(fmt_time(self.counter.elapsed().as_secs()))?
             .info("[Q]: quit, [Space]: pause/resume")?
             .flush()
     }
 
-    pub fn handle_command(self, command: Command) -> Option<Self> {
+    fn handle_command(self, cmd: Command) -> Option<Self> {
         let Self { counter } = self;
-        match command {
+        match cmd {
             Command::Quit => None,
-            Command::Pause => Some(Self { counter: counter.stop(), }),
-            Command::Resume => Some(Self { counter: counter.start(), }),
-            Command::Toggle | Command::Enter =>
-                Some(Self { counter: counter.toggle(), }),
-            _ => Some(Self { counter }),
+            Command::Pause => Some(counter.stop()),
+            Command::Resume => Some(counter.start()),
+            Command::Toggle | Command::Enter => Some(counter.toggle()),
+            _ => Some(counter),
         }
-    }
-
-    pub fn run(
-        terminal: &mut TerminalHandler,
-        start_time: Duration
-    ) -> Result<()> {
-        let counter = Stopwatch::from(start_time).start();
-        let mut state = StopwatchState { counter };
-        loop {
-            state.show(terminal)?;
-            if let Some(cmd) = get_event(TIMEOUT)?.map(Command::from) {
-                match state.handle_command(cmd) {
-                    Some(new_state) => state = new_state,
-                    None => return Ok(()),
-                }
-            }
-        }
+        .map(|counter| Self { counter })
     }
 }
+
