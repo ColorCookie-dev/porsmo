@@ -20,19 +20,20 @@ use terminal::TerminalHandler;
 use cli::{Cli, CounterMode, PomoMode};
 use clap::Parser;
 
+const DEFAULT_TIMER_TARGET: Duration = Duration::from_secs(25*60);
+
 fn main() -> Result<()> {
     let args = Cli::parse();
     let mut terminal = TerminalHandler::new()?;
     let terminal = &mut terminal;
     match args.mode {
         Some(CounterMode::Stopwatch { start_time }) => {
-            let start_time = Duration::from_secs(start_time);
-            StopwatchState::new(start_time)
+            StopwatchState::new(start_time.unwrap_or(Duration::ZERO))
                 .run(terminal)?;
         },
         Some(CounterMode::Timer { start_time: target }) => {
-            let target = Duration::from_secs(target);
             let start_time = Duration::ZERO;
+            let target = target.unwrap_or(DEFAULT_TIMER_TARGET);
             TimerState::new(start_time, target)
                 .run_alerted(terminal)?;
         },
@@ -44,19 +45,11 @@ fn main() -> Result<()> {
             PomoState::from(PomoConfig::long())
                 .run_alerted(terminal)?;
         },
-        Some(CounterMode::Pomodoro {
-            mode: Some(
-                      PomoMode::Custom {
-                          work_time,
-                          break_time,
-                          long_break_time: long_break
-                      }
-                  )
-        }) => {
-            let work_time = Duration::from_secs(work_time);
-            let break_time = Duration::from_secs(break_time);
-            let long_break = Duration::from_secs(long_break);
-
+        Some(CounterMode::Pomodoro { mode: Some(PomoMode::Custom {
+            work_time,
+            break_time,
+            long_break_time: long_break
+        })}) => {
             let config = PomoConfig::new(work_time, break_time, long_break);
             PomoState::from(config)
                 .run_alerted(terminal)?;

@@ -1,7 +1,9 @@
+use std::time::Duration;
+
 use crate::format::parse_time;
 use clap::{Parser, Subcommand};
 
-#[derive(Parser, Debug)]
+#[derive(Parser)]
 #[command(
     name = "Porsmo",
     author = "HellsNoah <hellsnoah@protonmail.com>",
@@ -14,24 +16,20 @@ pub struct Cli {
     pub mode: Option<CounterMode>,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand)]
 pub enum CounterMode {
     /// alias: s, stopwatch, counts up until you tell it to stop
     #[command(name = "stopwatch", alias = "s")]
     Stopwatch {
-        #[arg(value_parser = parse_time,
-               default_value_t = 0,
-               value_name = "time")]
+        #[arg(value_parser = parse_time, value_name = "time")]
         /// Lets you start timer from a particular time
-        start_time: u64,
+        start_time: Option<Duration>,
     },
     /// alias: t, timer, counts down until you tell it to stop, or it ends
     #[command(name = "timer", alias = "t")]
     Timer {
-        #[arg(value_parser = parse_time,
-               default_value_t = 25*60,
-               value_name = "time")]
-        start_time: u64,
+        #[arg(value_parser = parse_time, value_name = "time")]
+        start_time: Option<Duration>,
     },
     /// alias: p, pomodoro, for all you productivity needs (default)
     #[command(name = "pomodoro", alias = "p")]
@@ -53,11 +51,11 @@ pub enum PomoMode {
     #[command(name = "custom", alias = "c")]
     Custom {
         #[arg(value_parser = parse_time, value_name = "work-time")]
-        work_time: u64,
+        work_time: Duration,
         #[arg(value_parser = parse_time, value_name = "break-time")]
-        break_time: u64,
+        break_time: Duration,
         #[arg(value_parser = parse_time, value_name = "long-break-time")]
-        long_break_time: u64,
+        long_break_time: Duration,
     },
 }
 

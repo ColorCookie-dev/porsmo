@@ -1,4 +1,4 @@
-use std::num::ParseIntError;
+use std::{num::ParseIntError, time::Duration};
 
 pub fn fmt_time(time: u64) -> String {
     const MIN: u64 = 60;
@@ -34,7 +34,7 @@ pub enum TimeParseError {
     BadNumberOfSeparators,
 }
 
-pub fn parse_time(time_str: &str) -> Result<u64, TimeParseError> {
+pub fn parse_time(time_str: &str) -> Result<Duration, TimeParseError> {
     let mut secs = 0u64;
 
     for (i, e) in time_str.split(':').rev().enumerate() {
@@ -57,7 +57,7 @@ pub fn parse_time(time_str: &str) -> Result<u64, TimeParseError> {
         }
     }
 
-    Ok(secs)
+    Ok(Duration::from_secs(secs))
 }
 
 #[cfg(test)]
