@@ -29,7 +29,7 @@ pub enum CounterMode {
     #[command(name = "timer", alias = "t")]
     Timer {
         #[arg(value_parser = parse_time, value_name = "time")]
-        start_time: Option<Duration>,
+        target: Option<Duration>,
     },
     /// alias: p, pomodoro, for all you productivity needs (default)
     #[command(name = "pomodoro", alias = "p")]
@@ -55,7 +55,7 @@ pub enum PomoMode {
         #[arg(value_parser = parse_time, value_name = "break-time")]
         break_time: Duration,
         #[arg(value_parser = parse_time, value_name = "long-break-time")]
-        long_break_time: Duration,
+        long_break: Duration,
     },
 }
 

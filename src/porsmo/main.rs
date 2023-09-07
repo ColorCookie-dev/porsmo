@@ -31,7 +31,7 @@ fn main() -> Result<()> {
             StopwatchState::new(start_time.unwrap_or(Duration::ZERO))
                 .run(terminal)?;
         },
-        Some(CounterMode::Timer { start_time: target }) => {
+        Some(CounterMode::Timer { target }) => {
             let start_time = Duration::ZERO;
             let target = target.unwrap_or(DEFAULT_TIMER_TARGET);
             TimerState::new(start_time, target)
@@ -48,7 +48,7 @@ fn main() -> Result<()> {
         Some(CounterMode::Pomodoro { mode: Some(PomoMode::Custom {
             work_time,
             break_time,
-            long_break_time: long_break
+            long_break
         })}) => {
             let config = PomoConfig::new(work_time, break_time, long_break);
             PomoState::from(config)
