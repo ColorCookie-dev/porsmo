@@ -27,21 +27,22 @@ fn main() -> Result<()> {
     match args.mode {
         Some(CounterMode::Stopwatch { start_time }) => {
             let start_time = Duration::from_secs(start_time);
-            run_counter_ui_state(StopwatchState::new(start_time), terminal)?;
+            StopwatchState::new(start_time)
+                .run(terminal)?;
         },
         Some(CounterMode::Timer { start_time: target }) => {
             let target = Duration::from_secs(target);
             let start_time = Duration::ZERO;
-            let state = TimerState::new(start_time, target);
-            run_counter_ui_state(state, terminal)?;
+            TimerState::new(start_time, target)
+                .run_alerted(terminal)?;
         },
         Some(CounterMode::Pomodoro {mode: Some(PomoMode::Short) | None}) => {
-            let state = PomoState::from(PomoConfig::short());
-            run_counter_ui_state(state, terminal)?;
+            PomoState::from(PomoConfig::short())
+                .run_alerted(terminal)?;
         },
         Some(CounterMode::Pomodoro {mode: Some(PomoMode::Long)}) => {
-            let state = PomoState::from(PomoConfig::long());
-            run_counter_ui_state(state, terminal)?;
+            PomoState::from(PomoConfig::long())
+                .run_alerted(terminal)?;
         },
         Some(CounterMode::Pomodoro {
             mode: Some(
@@ -57,12 +58,12 @@ fn main() -> Result<()> {
             let long_break = Duration::from_secs(long_break);
 
             let config = PomoConfig::new(work_time, break_time, long_break);
-            let state = PomoState::from(config);
-            run_counter_ui_state(state, terminal)?;
+            PomoState::from(config)
+                .run_alerted(terminal)?;
         },
         None => {
-            let state = PomoState::from(PomoConfig::short());
-            run_counter_ui_state(state, terminal)?;
+            PomoState::from(PomoConfig::short())
+                .run_alerted(terminal)?;
         }
     }
     Ok(())
@@ -71,19 +72,41 @@ fn main() -> Result<()> {
 pub trait CounterUIState: Sized {
     fn show(&self, terminal: &mut TerminalHandler) -> Result<()>;
     fn handle_command(self, cmd: Command) -> Option<Self>;
-}
+    fn run(mut self, terminal: &mut TerminalHandler) -> Result<()> {
+        loop {
+            self.show(terminal)?;
+            if let Some(cmd) = get_event(TIMEOUT)?.map(Command::from) {
+                match self.handle_command(cmd) {
+                    Some(new_state) => self = new_state,
+                    None => return Ok(()),
+                }
+            }
+        }
+    }
 
-pub fn run_counter_ui_state(
-    mut state: impl CounterUIState,
-    terminal: &mut TerminalHandler,
-) -> Result<()> {
-    loop {
-        state.show(terminal)?;
-        if let Some(cmd) = get_event(TIMEOUT)?.map(Command::from) {
-            match state.handle_command(cmd) {
-                Some(new_state) => state = new_state,
-                None => return Ok(()),
+    fn run_alerted(mut self, terminal: &mut TerminalHandler) -> Result<()>
+    where Self: Alertable
+    {
+        loop {
+            self.show(terminal)?;
+            if self.should_alert() && !self.alerted() {
+                self.set_alert(true);
+                self.alert();
+            }
+            if let Some(cmd) = get_event(TIMEOUT)?.map(Command::from) {
+                match self.handle_command(cmd) {
+                    Some(new_state) => self = new_state,
+                    None => return Ok(()),
+                }
             }
         }
     }
 }
+
+pub trait Alertable {
+    fn alerted(&self) -> bool;
+    fn set_alert(&mut self, alert: bool);
+    fn should_alert(&self) -> bool;
+    fn alert(&mut self);
+}
+

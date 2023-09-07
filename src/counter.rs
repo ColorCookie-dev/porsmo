@@ -1,9 +1,15 @@
 use std::time::{Duration, Instant};
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct Counter {
     start: Option<Instant>,
     elapsed: Duration,
+}
+
+impl Default for Counter {
+    fn default() -> Self {
+        Self { start: Some(Instant::now()), elapsed: Duration::ZERO }
+    }
 }
 
 impl From<Duration> for Counter {

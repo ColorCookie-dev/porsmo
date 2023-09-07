@@ -1,6 +1,5 @@
-use crate::input::{TIMEOUT, get_event};
-use crate::{prelude::*, CounterUIState};
-use crate::alert::Alert;
+use crate::{prelude::*, CounterUIState, Alertable};
+use crate::alert::{Alert, alert};
 use crate::terminal::running_color;
 use crate::{
     format::fmt_time,
@@ -22,6 +21,7 @@ pub struct PomoState {
     pub mode:    PomoStateMode,
     pub session: Session,
     pub config:  PomoConfig,
+    alert: bool,
 }
 
 #[derive(Debug)]
@@ -58,6 +58,7 @@ impl PomoState {
             mode,
             session,
             config,
+            alert: false,
         }
     }
 
@@ -190,7 +191,7 @@ impl CounterUIState for PomoState {
         &self,
         terminal: &mut TerminalHandler,
     ) -> Result<()> {
-        let target = self.session.mode.get_time(&self.config);
+        let target = self.target();
         let round_number = format!("Round: {}", self.session.number);
         match self.mode {
             PomoStateMode::Skip { .. } => {
@@ -237,5 +238,39 @@ impl CounterUIState for PomoState {
             },
         }
         Ok(())
+    }
+}
+
+impl PomoState {
+    fn elpased(&self) -> Duration {
+        match self.mode {
+            PomoStateMode::Running { counter } => counter.elapsed(),
+            PomoStateMode::Skip { elapsed } => elapsed,
+        }
+    }
+
+    fn target(&self) -> Duration {
+        self.session.mode.get_time(&self.config)
+    }
+}
+
+impl Alertable for PomoState {
+    fn alert(&mut self) {
+        let (title, message) = Self::pomodoro_alert_message(
+            self.session.next().mode
+        );
+        alert(title, message);
+    }
+
+    fn alerted(&self) -> bool {
+        self.alert
+    }
+
+    fn set_alert(&mut self, alert: bool) {
+        self.alert = alert;
+    }
+
+    fn should_alert(&self) -> bool {
+        self.elpased() > self.target()
     }
 }

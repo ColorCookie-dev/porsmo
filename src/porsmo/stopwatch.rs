@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use crate::input::{get_event, TIMEOUT};
 use crate::{prelude::*, CounterUIState};
 use crate::terminal::running_color;
 use crate::{

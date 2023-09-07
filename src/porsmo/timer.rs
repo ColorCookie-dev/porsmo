@@ -1,6 +1,5 @@
-use crate::input::{TIMEOUT, get_event};
-use crate::{prelude::*, CounterUIState};
-use crate::alert::Alert;
+use crate::{prelude::*, CounterUIState, Alertable};
+use crate::alert::{Alert, alert};
 use crate::terminal::running_color;
 use crate::{
     format::fmt_time,
@@ -14,12 +13,17 @@ use std::time::Duration;
 pub struct TimerState {
     pub counter: Counter,
     pub target: Duration,
+    pub alert: bool,
 }
 
 impl TimerState {
     pub fn new(start_time: Duration, target: Duration) -> Self {
-        let counter = Counter::from(start_time);
-        Self { counter, target }
+        let counter = Counter::from(start_time).start();
+        Self {
+            counter,
+            target,
+            alert: false
+        }
     }
 }
 
@@ -37,12 +41,6 @@ impl CounterUIState for TimerState {
                 .flush()?;
         } else {
             let excess_time = elapsed.saturating_sub(self.target);
-            let title = "The timer has ended!";
-            let message = format!(
-                "Your Timer of {initial} has ended",
-                initial = fmt_time(self.target.as_secs())
-            );
-
             terminal
                 .clear()?
                 .info("Timer Has Ended")?
@@ -62,9 +60,33 @@ impl CounterUIState for TimerState {
             Command::Resume =>
                 Some(Self { counter: self.counter.start(), ..self}),
             Command::Toggle | Command::Enter =>
-                Some(Self { counter: self.counter.start(), ..self}),
+                Some(Self { counter: self.counter.toggle(), ..self}),
             _ => Some(self),
         }
     }
 }
 
+impl Alertable for TimerState {
+    fn alerted(&self) -> bool {
+        self.alert
+    }
+
+    fn set_alert(&mut self, alert: bool) {
+        self.alert = alert;
+    }
+
+    fn should_alert(&self) -> bool {
+        self.counter.elapsed() > self.target
+    }
+
+    fn alert(&mut self) {
+        let title = "The timer has ended!";
+        let message = format!(
+            "Your Timer of {initial} has ended",
+            initial = fmt_time(self.target.as_secs())
+        );
+
+        alert(title, message);
+        self.alert = true;
+    }
+}
