@@ -1,5 +1,5 @@
 use crate::{prelude::*, CounterUIState, Alertable};
-use crate::alert::{Alert, alert};
+use crate::alert::alert;
 use crate::terminal::running_color;
 use crate::{
     format::fmt_time,
@@ -21,7 +21,7 @@ pub struct PomoState {
     pub mode:    PomoStateMode,
     pub session: Session,
     pub config:  PomoConfig,
-    alert: bool,
+    pub alert: bool,
 }
 
 #[derive(Debug)]
@@ -49,23 +49,6 @@ impl From<PomoConfig> for PomoState {
 }
 
 impl PomoState {
-    pub fn new(
-        mode: PomoStateMode,
-        session: Session,
-        config: PomoConfig,
-    ) -> Self {
-        Self {
-            mode,
-            session,
-            config,
-            alert: false,
-        }
-    }
-
-    fn default_with_config(config: PomoConfig) -> Self {
-        Self { config, ..Default::default() }
-    }
-
     fn title(mode: Mode) -> &'static str {
         match mode {
             Mode::Work => "Pomodoro (Work)",
@@ -222,7 +205,7 @@ impl CounterUIState for PomoState {
             },
             PomoStateMode::Running { counter } => {
                 let excess_time = counter.elapsed().saturating_sub(target);
-                let (title, message) = Self::pomodoro_alert_message(
+                let (_, message) = Self::pomodoro_alert_message(
                     self.session.next().mode
                 );
                 // TODO: Alert

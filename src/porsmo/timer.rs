@@ -1,5 +1,5 @@
 use crate::{prelude::*, CounterUIState, Alertable};
-use crate::alert::{Alert, alert};
+use crate::alert::alert;
 use crate::terminal::running_color;
 use crate::{
     format::fmt_time,
