@@ -104,7 +104,7 @@ impl CounterUIState for PomoState {
 
             Command::Enter => match self.mode {
                 PomoStateMode::Running { counter }
-                if counter.elapsed() < self.session.mode.get_time(&self.config)
+                if counter.elapsed() >= self.session.mode.get_time(&self.config)
                     => {
                     let counter = Counter::default().start();
                     let mode = PomoStateMode::Running { counter };
@@ -115,7 +115,7 @@ impl CounterUIState for PomoState {
                     let counter = Counter::default().start();
                     let mode = PomoStateMode::Running { counter };
                     let session = self.session.next();
-                    Some(PomoState{ mode, session, ..self })
+                    Some(Self { mode, session, ..self })
                 },
                 _ => Some(self),
             },
