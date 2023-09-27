@@ -1,6 +1,4 @@
-pub use anyhow::Result;
-pub use anyhow::bail;
-pub use anyhow::Context;
+pub use crate::error::PorsmoError;
 
-#[derive(Debug)]
-pub struct W<T>(pub T);
+pub type Result<T> = core::result::Result<T, PorsmoError>;
+

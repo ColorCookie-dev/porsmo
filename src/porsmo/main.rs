@@ -1,151 +1,105 @@
 mod prelude;
+mod error;
 mod alert;
 mod format;
 mod input;
-mod notification;
 mod pomodoro;
-mod sound;
 mod stopwatch;
 mod terminal;
 mod timer;
+mod cli;
 
-use crate::format::fmt_time;
-use crate::prelude::*;
-use pomodoro::PomodoroUI;
-use stopwatch::StopwatchUI;
-use timer::TimerUI;
-use clap::{Parser, Subcommand};
+use input::{Command, get_event, TIMEOUT};
+use pomodoro::PomoState;
+use prelude::*;
+use stopwatch::StopwatchState;
+use timer::TimerState;
+use std::time::Duration;
+use porsmo::pomodoro::PomoConfig;
+use terminal::TerminalHandler;
+use cli::{Cli, CounterMode, PomoMode};
+use clap::Parser;
 
-#[derive(Parser, Debug)]
-#[command(
-    name = "Porsmo",
-    author = "HellsNoah <hellsnoah@protonmail.com>",
-    version = "0.2.0",
-    about = "Timer and Stopwatch and Pomodoro",
-    long_about = None,
-)]
-struct Cli {
-    #[command(subcommand, name = "mode")]
-    mode: Option<Modes>,
-}
-
-#[derive(Subcommand, Debug)]
-enum Modes {
-    /// alias: s, stopwatch, counts up until you tell it to stop
-    #[command(name = "stopwatch", alias = "s")]
-    Stopwatch {
-        #[arg(value_parser = parse_time,
-               default_value_t = 0,
-               value_name = "time")]
-        /// Lets you start timer from a particular time
-        start_time: u64,
-    },
-    /// alias: t, timer, counts down until you tell it to stop, or it ends
-    #[command(name = "timer", alias = "t")]
-    Timer {
-        #[arg(value_parser = parse_time,
-               default_value_t = 25*60,
-               value_name = "time")]
-        start_time: u64,
-    },
-    /// alias: p, pomodoro, for all you productivity needs (default)
-    #[command(name = "pomodoro", alias = "p")]
-    Pomodoro {
-        #[clap(subcommand, name = "mode")]
-        mode: Option<PomoMode>,
-    },
-}
-
-#[derive(Subcommand, Debug)]
-enum PomoMode {
-    /// alias: s, short pomodoro, with 25, 5, 10 min values (default)
-    #[command(name = "short", alias = "s")]
-    Short,
-    /// alias: l, long pomodoro, with 55, 10, 20 min values
-    #[command(name = "long", alias = "l")]
-    Long,
-    /// alias: c, custom pomodoro, with any specified values
-    #[command(name = "custom", alias = "c")]
-    Custom {
-        #[arg(value_parser = parse_time, value_name = "work-time")]
-        work_time: u64,
-        #[arg(value_parser = parse_time, value_name = "break-time")]
-        break_time: u64,
-        #[arg(value_parser = parse_time, value_name = "long-break-time")]
-        long_break_time: u64,
-    },
-}
+const DEFAULT_TIMER_TARGET: Duration = Duration::from_secs(25*60);
 
 fn main() -> Result<()> {
     let args = Cli::parse();
+    let mut terminal = TerminalHandler::new()?;
+    let terminal = &mut terminal;
     match args.mode {
-        Some(Modes::Stopwatch { start_time }) => StopwatchUI::from_secs(start_time),
-        Some(Modes::Timer { start_time }) => TimerUI::from_secs(start_time),
-        Some(Modes::Pomodoro { mode }) => match mode {
-            Some(PomoMode::Short) | None => PomodoroUI::short(),
-            Some(PomoMode::Long) => PomodoroUI::long(),
-            Some(PomoMode::Custom {work_time, break_time, long_break_time, }) =>
-                PomodoroUI::from_secs(work_time, break_time, long_break_time),
+        Some(CounterMode::Stopwatch { start_time }) => {
+            StopwatchState::new(start_time.unwrap_or(Duration::ZERO))
+                .run(terminal)?;
         },
-        None => PomodoroUI::short(),
+        Some(CounterMode::Timer { target }) => {
+            let start_time = Duration::ZERO;
+            let target = target.unwrap_or(DEFAULT_TIMER_TARGET);
+            TimerState::new(start_time, target)
+                .run_alerted(terminal)?;
+        },
+        Some(CounterMode::Pomodoro {mode: Some(PomoMode::Short) | None}) => {
+            PomoState::from(PomoConfig::short())
+                .run_alerted(terminal)?;
+        },
+        Some(CounterMode::Pomodoro {mode: Some(PomoMode::Long)}) => {
+            PomoState::from(PomoConfig::long())
+                .run_alerted(terminal)?;
+        },
+        Some(CounterMode::Pomodoro { mode: Some(PomoMode::Custom {
+            work_time,
+            break_time,
+            long_break
+        })}) => {
+            let config = PomoConfig::new(work_time, break_time, long_break);
+            PomoState::from(config)
+                .run_alerted(terminal)?;
+        },
+        None => {
+            PomoState::from(PomoConfig::short())
+                .run_alerted(terminal)?;
+        }
     }
-    .map(|time| {
-        println!("{}", fmt_time(time));
-    })
+    Ok(())
 }
 
-fn parse_time(time_str: &str) -> Result<u64> {
-    let mut secs = 0u64;
-
-    for (i, e) in time_str.split(':').rev().enumerate() {
-        if e.is_empty() {
-            continue;
-        }
-
-        let en = e.parse::<u64>()?;
-
-        if i == 0 {
-            secs += en;
-        } else if i == 1 {
-            secs += en * 60;
-        } else if i == 2 {
-            secs += en * 60 * 60;
-        } else if i == 3 {
-            secs += en * 3600 * 24;
-        } else {
-            bail!("Bad number of ':'");
+pub trait CounterUIState: Sized {
+    fn show(&self, terminal: &mut TerminalHandler) -> Result<()>;
+    fn handle_command(self, cmd: Command) -> Option<Self>;
+    fn run(mut self, terminal: &mut TerminalHandler) -> Result<()> {
+        loop {
+            self.show(terminal)?;
+            if let Some(cmd) = get_event(TIMEOUT)?.map(Command::from) {
+                match self.handle_command(cmd) {
+                    Some(new_state) => self = new_state,
+                    None => return Ok(()),
+                }
+            }
         }
     }
 
-    Ok(secs)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_parse_time() -> Result<()> {
-        let ok_cases = vec![
-            ("", 0),
-            (":", 0),
-            ("::10", 10),
-            ("1020", 1020),
-            ("2:000092", 2 * 60 + 92),
-            ("2:", 2 * 60),
-            ("2:2:2", (2 * 60 + 2) * 60 + 2),
-            ("1:::", 1 * 24 * 60 * 60),
-        ];
-
-        for (inp, out) in ok_cases.iter() {
-            assert_eq!(parse_time(inp)?, *out);
+    fn run_alerted(mut self, terminal: &mut TerminalHandler) -> Result<()>
+    where Self: Alertable
+    {
+        loop {
+            self.show(terminal)?;
+            if self.should_alert() && !self.alerted() {
+                self.set_alert(true);
+                self.alert();
+            }
+            if let Some(cmd) = get_event(TIMEOUT)?.map(Command::from) {
+                match self.handle_command(cmd) {
+                    Some(new_state) => self = new_state,
+                    None => return Ok(()),
+                }
+            }
         }
-
-        let err_cases = vec!["1::::", "kjdf:kjfk", ":kjfk", "1:4k:5"];
-
-        for inp in err_cases.iter() {
-            assert!(parse_time(inp).is_err());
-        }
-
-        Ok(())
     }
 }
+
+pub trait Alertable {
+    fn alerted(&self) -> bool;
+    fn set_alert(&mut self, alert: bool);
+    fn should_alert(&self) -> bool;
+    fn alert(&mut self);
+}
+

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::{prelude::*, error::PorsmoError};
 use std::{
     fmt::Display,
     io::{stdout, Write, Stdout},
@@ -10,9 +10,9 @@ use crossterm::{
         EnterAlternateScreen,
         LeaveAlternateScreen,
     },
-    cursor,
+    cursor::{MoveTo, MoveToNextLine},
     execute,
-    terminal,
+    terminal::{Clear, ClearType},
     style::{SetForegroundColor, Color, Print},
     event::{DisableMouseCapture, EnableMouseCapture},
 };
@@ -20,97 +20,69 @@ use crossterm::{
 pub struct TerminalHandler(pub Stdout);
 
 impl TerminalHandler {
-    pub fn new() -> anyhow::Result<Self> {
-        enable_raw_mode().with_context(|| "Unable to enter raw mode")?;
+    pub fn new() -> Result<Self> {
+        enable_raw_mode()
+            .map_err(PorsmoError::FailedRawModeEnter)?;
+
         let mut stdout = std::io::stdout();
         execute!(
             &mut stdout,
-            EnterAlternateScreen,
-            EnableMouseCapture,
-            terminal::Clear(terminal::ClearType::All),
-        ).with_context(|| "Unable to write to terminal")?;
+            EnterAlternateScreen, EnableMouseCapture,
+            Clear(ClearType::All), MoveTo(0, 0),
+        ).map_err(PorsmoError::FailedInitialization)?;
 
         Ok(Self(stdout))
     }
 
-    pub fn show_time(
-        &mut self,
-        time: impl Display,
-        running: bool,
-        pos: Pos,
-    ) -> Result<()> {
-        if running {
-            self.show_text(time, Color::Green, pos)?;
-        } else {
-            self.show_text(time, Color::Red, pos)?;
-        }
-        Ok(())
+    pub fn stdout(&mut self) -> &mut Stdout {
+        &mut self.0
     }
 
-    pub fn show_counter(
-        &mut self,
-        title: impl Display,
-        time: impl Display,
-        running: bool,
-        controls: impl Display,
-        message: impl Display,
-    ) -> Result<()> {
-        self.clear()?;
-        self.show_text(title, Color::Magenta, (1, 1).into())?;
-        self.show_time(time, running, (1, 2).into())?;
-        self.show_text(controls, Color::Magenta, (1, 3).into())?;
-        self.show_text(message, Color::Yellow, (1, 4).into())?;
-
-        Ok(())
-    }
-
-    pub fn show_text(
-        &mut self,
-        text: impl Display,
-        color: Color,
-        pos: Pos,
-    ) -> Result<()> {
+    pub fn clear(&mut self) -> Result<&mut Self> {
         let stdout = &mut self.0;
         execute!(
             stdout,
-            cursor::MoveTo(pos.right, pos.down),
+            MoveTo(0, 0), Clear(ClearType::All),
+        )
+        .map_err(PorsmoError::FailedClear)?;
+
+        stdout.flush().map_err(PorsmoError::FlushError)?;
+        Ok(self)
+    }
+
+    pub fn set_foreground_color(&mut self, color: Color) -> Result<&mut Self> {
+        execute!(
+            self.stdout(),
             SetForegroundColor(color),
-            Print(text),
-        )
-        .with_context(|| "failed to display timer")?;
-        stdout.flush().with_context(|| "failed to flush stdout")
+        ).map_err(PorsmoError::ForegroundColorSetFailed)?;
+        Ok(self)
     }
 
-    pub fn clear(&mut self) -> Result<()> {
-        let stdout = &mut self.0;
+    pub fn print(&mut self, text: impl Display) -> Result<&mut Self> {
         execute!(
-            stdout,
-            cursor::MoveTo(1, 1),
-            terminal::Clear(terminal::ClearType::All),
-        )
-        .with_context(|| "failed to clear the terminal")?;
-
-        stdout.flush().with_context(|| "failed to flush stdout")
+            self.stdout(),
+            Print(text), MoveToNextLine(1),
+        ).map_err(PorsmoError::FailedPrint)?;
+        Ok(self)
     }
 
-    pub fn show_prompt(
-        &mut self,
-        prompt: impl Display,
-        prompt_color: Color,
-        message: impl Display,
-    ) -> Result<()> {
-        self.clear()?;
-        self.show_text(prompt, prompt_color, (1, 1).into())?;
-        self.show_text(
-            "[Enter]: Yes, [Q/N]: No",
-            Color::Magenta,
-            (1, 2).into(),
-        )?;
-        self.show_text(message, Color::Yellow, (1, 3).into())?;
-
-        Ok(())
+    pub fn info(&mut self, text: impl Display) -> Result<&mut Self> {
+        self
+            .set_foreground_color(Color::Magenta)?
+            .print(text)
     }
 
+    pub fn status(&mut self, text: impl Display) -> Result<&mut Self> {
+        self
+            .set_foreground_color(Color::Yellow)?
+            .print(text)
+    }
+
+    pub fn flush(&mut self) -> Result<()> {
+        self.stdout()
+            .flush()
+            .map_err(PorsmoError::FlushError)
+    }
 }
 
 impl Drop for TerminalHandler {
@@ -118,22 +90,15 @@ impl Drop for TerminalHandler {
         disable_raw_mode().expect("Failed to disable raw mode");
         execute!(
             stdout(),
-            terminal::Clear(terminal::ClearType::All),
-            DisableMouseCapture,
-            LeaveAlternateScreen,
+            Clear(ClearType::All),
+            DisableMouseCapture, LeaveAlternateScreen,
         ).expect("Failed to reset screen");
     }
 }
 
-pub struct Pos {
-    right: u16,
-    down: u16,
-}
-
-impl From<(u16, u16)> for Pos {
-    fn from(pos: (u16, u16)) -> Self {
-        let (right, down) = pos;
-        Self { right, down }
+pub fn running_color(running: bool) -> Color {
+    match running {
+        true => Color::Green,
+        false => Color::Red,
     }
 }
-

@@ -1,82 +1,92 @@
+use crate::{prelude::*, CounterUIState, Alertable};
+use crate::alert::alert;
+use crate::terminal::running_color;
 use crate::{
-    alert::alert,
     format::fmt_time,
     input::Command,
-    stopwatch::default_stopwatch_loop,
     terminal::TerminalHandler,
 };
-use crate::prelude::*;
-use crossterm::event;
-use porsmo::{counter::Counter, timer::Timer};
-use std::{thread, time::Duration};
+use porsmo::counter::Counter;
+use std::time::Duration;
 
-pub struct TimerUI;
+#[derive(Debug)]
+pub struct TimerState {
+    pub counter: Counter,
+    pub target: Duration,
+    pub alert: bool,
+}
 
-impl TimerUI {
-    pub fn new(time: Duration) -> Result<Duration> {
-        timer(time)
-    }
-
-    pub fn from_secs(time: u64) -> Result<Duration> {
-        timer(Duration::from_secs(time))
+impl TimerState {
+    pub fn new(start_time: Duration, target: Duration) -> Self {
+        let counter = Counter::from(start_time).start();
+        Self {
+            counter,
+            target,
+            alert: false
+        }
     }
 }
 
-pub fn timer(time: Duration) -> Result<Duration> {
-    let mut c = Timer::new(time);
-    let mut terminal = &mut TerminalHandler::new()?;
-    let counter_ended_at;
-
-    loop {
-        if event::poll(Duration::from_millis(250))
-            .with_context(|| "Polling failed")? {
-            let event = event::read().with_context(|| "Failed to read event")?;
-            let command = Command::from(event);
-            match command {
-                Command::Quit => {
-                    c.end_count();
-                    counter_ended_at = c.elapsed();
-                    break;
-                },
-                Command::Pause => c.pause(),
-                Command::Resume => c.resume(),
-                Command::Toggle | Command::Enter => c.toggle(),
-                _ => (),
-            }
+impl CounterUIState for TimerState {
+    fn show(&self, terminal: &mut TerminalHandler) -> Result<()> {
+        let elapsed = self.counter.elapsed();
+        if elapsed < self.target {
+            let time_left = self.target.saturating_sub(elapsed);
+            terminal
+                .clear()?
+                .info("Timer")?
+                .set_foreground_color(running_color(self.counter.started()))?
+                .print(fmt_time(time_left.as_secs()))?
+                .info("[Q]: quit, [Space]: pause/resume")?
+                .flush()?;
+        } else {
+            let excess_time = elapsed.saturating_sub(self.target);
+            terminal
+                .clear()?
+                .info("Timer Has Ended")?
+                .set_foreground_color(running_color(self.counter.started()))?
+                .print(format_args!("+{}", fmt_time(excess_time.as_secs())))?
+                .info("[Q]: quit, [Space]: pause/resume")?
+                .flush()?;
         }
-
-        if c.has_ended() {
-            c.end_count();
-            alert("Timer ended!".into(), "You Porsmo timer has ended".into());
-            counter_ended_at = start_excess_counting(&mut terminal)?;
-            break;
-        }
-
-        terminal.show_counter(
-            "Timer",
-            fmt_time(c.elapsed()),
-            c.is_running(),
-            "[Q]: quit, [Space]: pause/resume",
-            "",
-        )?;
-
-        thread::sleep(Duration::from_millis(100));
-    }
-
-    Ok(counter_ended_at)
-}
-
-fn start_excess_counting(terminal: &mut TerminalHandler)
-    -> Result<Duration> {
-    default_stopwatch_loop(Duration::ZERO, move |st| {
-        terminal.show_counter(
-            "Timer has ended",
-            format!("+{}", fmt_time(st.elapsed())),
-            st.is_running(),
-            "[Q]: quit, [Space]: pause/resume",
-            "",
-        )?;
-
         Ok(())
-    })
+    }
+
+    fn handle_command(self, command: Command) -> Option<Self> {
+        match command {
+            Command::Quit => None,
+            Command::Pause =>
+                Some(Self { counter: self.counter.stop(), ..self}),
+            Command::Resume =>
+                Some(Self { counter: self.counter.start(), ..self}),
+            Command::Toggle | Command::Enter =>
+                Some(Self { counter: self.counter.toggle(), ..self}),
+            _ => Some(self),
+        }
+    }
+}
+
+impl Alertable for TimerState {
+    fn alerted(&self) -> bool {
+        self.alert
+    }
+
+    fn set_alert(&mut self, alert: bool) {
+        self.alert = alert;
+    }
+
+    fn should_alert(&self) -> bool {
+        self.counter.elapsed() > self.target
+    }
+
+    fn alert(&mut self) {
+        let title = "The timer has ended!";
+        let message = format!(
+            "Your Timer of {initial} has ended",
+            initial = fmt_time(self.target.as_secs())
+        );
+
+        alert(title, message);
+        self.alert = true;
+    }
 }

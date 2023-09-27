@@ -1,4 +1,7 @@
-use crossterm::event::{ KeyCode, KeyEvent, KeyModifiers, Event};
+use crate::prelude::*;
+use std::time::Duration;
+
+use crossterm::event::{ KeyCode, KeyEvent, KeyModifiers, Event, KeyEventKind, self};
 
 pub enum Command {
     Quit,
@@ -26,60 +29,81 @@ impl From<KeyEvent> for Command {
         match key {
             KeyEvent {
                 code: KeyCode::Char('q'),
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                kind: KeyEventKind::Press,
+                modifiers: KeyModifiers::NONE, ..
             } => Self::Quit,
             KeyEvent {
                 code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-                kind: _, state: _
+                kind: KeyEventKind::Press,
+                modifiers: KeyModifiers::CONTROL, ..
             } => Self::Quit,
             KeyEvent {
                 code: KeyCode::Char('z'),
-                modifiers: KeyModifiers::CONTROL,
-                kind: _, state: _
+                kind: KeyEventKind::Press,
+                modifiers: KeyModifiers::CONTROL, ..
             } => Self::Quit,
             KeyEvent {
                 code: KeyCode::Char(' '),
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                kind: KeyEventKind::Press,
+                modifiers: KeyModifiers::NONE, ..
             } => Self::Toggle,
             KeyEvent {
                 code: KeyCode::Enter,
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                kind: KeyEventKind::Press,
+                modifiers: KeyModifiers::NONE, ..
             } => Self::Enter,
             KeyEvent {
                 code: KeyCode::Char('S'),
-                modifiers: KeyModifiers::SHIFT,
-                kind: _, state: _
+                kind: KeyEventKind::Press,
+                modifiers: KeyModifiers::SHIFT, ..
             } => Self::Skip,
             KeyEvent {
                 code: KeyCode::Char('y'),
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                kind: KeyEventKind::Press,
+                modifiers: KeyModifiers::NONE, ..
             } => Self::Yes,
             KeyEvent {
                 code: KeyCode::Char('n'),
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                kind: KeyEventKind::Press,
+                modifiers: KeyModifiers::NONE, ..
             } => Self::No,
             KeyEvent {
                 code: KeyCode::Char('t'),
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                kind: KeyEventKind::Press,
+                modifiers: KeyModifiers::NONE, ..
             } => Self::Toggle,
             KeyEvent {
                 code: KeyCode::Char('p'),
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                kind: KeyEventKind::Press,
+                modifiers: KeyModifiers::NONE, ..
             } => Self::Pause,
             KeyEvent {
                 code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::NONE,
-                kind: _, state: _
+                kind: KeyEventKind::Press,
+                modifiers: KeyModifiers::NONE, ..
             } => Self::Resume,
             _ => Self::Invalid,
         }
     }
 }
+
+pub struct CommandIter;
+
+impl Iterator for CommandIter {
+    type Item = Result<Command>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(get_event(TIMEOUT).transpose()?.map(Command::from))
+    }
+}
+
+pub const TIMEOUT: Duration = Duration::from_millis(250);
+
+pub fn get_event(timeout: Duration) -> Result<Option<event::Event>> {
+    if event::poll(timeout)? {
+        Ok (Some (event::read()?))
+    } else {
+        Ok (None)
+    }
+}
+
