@@ -1,12 +1,8 @@
 use std::time::Duration;
 
-use crate::{prelude::*, CounterUIState};
 use crate::terminal::running_color;
-use crate::{
-    format::fmt_time,
-    input::Command,
-    terminal::TerminalHandler,
-};
+use crate::{format::fmt_time, input::Command, terminal::TerminalHandler};
+use crate::{prelude::*, CounterUIState};
 use porsmo::counter::Counter as Stopwatch;
 
 #[derive(Debug)]
@@ -22,10 +18,7 @@ impl StopwatchState {
 }
 
 impl CounterUIState for StopwatchState {
-    fn show(
-        &self,
-        terminal: &mut TerminalHandler,
-    ) -> Result<()> {
+    fn show(&self, terminal: &mut TerminalHandler) -> Result<()> {
         terminal
             .clear()?
             .info("Stopwatch")?
@@ -47,4 +40,3 @@ impl CounterUIState for StopwatchState {
         .map(|counter| Self { counter })
     }
 }
-

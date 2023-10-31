@@ -1,13 +1,10 @@
-use std::time::Duration;
 use porsmo::pomodoro::PomoConfig;
+use std::time::Duration;
 
 use crate::prelude::*;
 use crate::{
-    TIMEOUT,
-    input::Command,
-    pomodoro::PomodoroUI,
-    terminal::TerminalHandler,
-    timer::TimerUI, get_event, prelude::PorsmoError,
+    get_event, input::Command, pomodoro::PomodoroUI, prelude::PorsmoError,
+    terminal::TerminalHandler, timer::TimerUI, TIMEOUT,
 };
 
 pub enum PorsmoUI {
@@ -59,4 +56,3 @@ impl PorsmoUI {
         PorsmoUI::Pomodoro(PomodoroUI::new(config))
     }
 }
-

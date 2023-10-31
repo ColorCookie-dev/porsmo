@@ -1,26 +1,26 @@
-mod prelude;
-mod error;
 mod alert;
+mod cli;
+mod error;
 mod format;
 mod input;
 mod pomodoro;
+mod prelude;
 mod stopwatch;
 mod terminal;
 mod timer;
-mod cli;
 
-use input::{Command, get_event, TIMEOUT};
-use pomodoro::PomoState;
-use prelude::*;
-use stopwatch::StopwatchState;
-use timer::TimerState;
-use std::time::Duration;
-use porsmo::pomodoro::PomoConfig;
-use terminal::TerminalHandler;
-use cli::{Cli, CounterMode, PomoMode};
 use clap::Parser;
+use cli::{Cli, CounterMode, PomoMode};
+use input::{get_event, Command, TIMEOUT};
+use pomodoro::PomoState;
+use porsmo::pomodoro::PomoConfig;
+use prelude::*;
+use std::time::Duration;
+use stopwatch::StopwatchState;
+use terminal::TerminalHandler;
+use timer::TimerState;
 
-const DEFAULT_TIMER_TARGET: Duration = Duration::from_secs(25*60);
+const DEFAULT_TIMER_TARGET: Duration = Duration::from_secs(25 * 60);
 
 fn main() -> Result<()> {
     let args = Cli::parse();
@@ -28,35 +28,36 @@ fn main() -> Result<()> {
     let terminal = &mut terminal;
     match args.mode {
         Some(CounterMode::Stopwatch { start_time }) => {
-            StopwatchState::new(start_time.unwrap_or(Duration::ZERO))
-                .run(terminal)?;
-        },
+            StopwatchState::new(start_time.unwrap_or(Duration::ZERO)).run(terminal)?;
+        }
         Some(CounterMode::Timer { target }) => {
             let start_time = Duration::ZERO;
             let target = target.unwrap_or(DEFAULT_TIMER_TARGET);
-            TimerState::new(start_time, target)
-                .run_alerted(terminal)?;
-        },
-        Some(CounterMode::Pomodoro {mode: Some(PomoMode::Short) | None}) => {
-            PomoState::from(PomoConfig::short())
-                .run_alerted(terminal)?;
-        },
-        Some(CounterMode::Pomodoro {mode: Some(PomoMode::Long)}) => {
-            PomoState::from(PomoConfig::long())
-                .run_alerted(terminal)?;
-        },
-        Some(CounterMode::Pomodoro { mode: Some(PomoMode::Custom {
-            work_time,
-            break_time,
-            long_break
-        })}) => {
+            TimerState::new(start_time, target).run_alerted(terminal)?;
+        }
+        Some(CounterMode::Pomodoro {
+            mode: Some(PomoMode::Short) | None,
+        }) => {
+            PomoState::from(PomoConfig::short()).run_alerted(terminal)?;
+        }
+        Some(CounterMode::Pomodoro {
+            mode: Some(PomoMode::Long),
+        }) => {
+            PomoState::from(PomoConfig::long()).run_alerted(terminal)?;
+        }
+        Some(CounterMode::Pomodoro {
+            mode:
+                Some(PomoMode::Custom {
+                    work_time,
+                    break_time,
+                    long_break,
+                }),
+        }) => {
             let config = PomoConfig::new(work_time, break_time, long_break);
-            PomoState::from(config)
-                .run_alerted(terminal)?;
-        },
+            PomoState::from(config).run_alerted(terminal)?;
+        }
         None => {
-            PomoState::from(PomoConfig::short())
-                .run_alerted(terminal)?;
+            PomoState::from(PomoConfig::short()).run_alerted(terminal)?;
         }
     }
     Ok(())
@@ -78,7 +79,8 @@ pub trait CounterUIState: Sized {
     }
 
     fn run_alerted(mut self, terminal: &mut TerminalHandler) -> Result<()>
-    where Self: Alertable
+    where
+        Self: Alertable,
     {
         loop {
             self.show(terminal)?;
@@ -102,4 +104,3 @@ pub trait Alertable {
     fn should_alert(&self) -> bool;
     fn alert(&mut self);
 }
-

@@ -18,11 +18,18 @@ impl Default for PomodoroSession {
 impl PomodoroSession {
     pub fn next(&self) -> Self {
         match self.mode {
-            Mode::Work if self.number % 4 == 0 =>
-                    Self { mode: Mode::LongBreak, ..*self },
-            Mode::Work => Self { mode: Mode::Break, ..*self },
-            Mode::Break | Mode::LongBreak =>
-                Self { mode: Mode::Work, number: self.number + 1 }
+            Mode::Work if self.number % 4 == 0 => Self {
+                mode: Mode::LongBreak,
+                ..*self
+            },
+            Mode::Work => Self {
+                mode: Mode::Break,
+                ..*self
+            },
+            Mode::Break | Mode::LongBreak => Self {
+                mode: Mode::Work,
+                number: self.number + 1,
+            },
         }
     }
 }

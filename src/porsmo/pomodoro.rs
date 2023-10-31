@@ -1,38 +1,26 @@
-use crate::{prelude::*, CounterUIState, Alertable};
 use crate::alert::alert;
 use crate::terminal::running_color;
-use crate::{
-    format::fmt_time,
-    input::Command,
-    terminal::TerminalHandler,
-};
+use crate::{format::fmt_time, input::Command, terminal::TerminalHandler};
+use crate::{prelude::*, Alertable, CounterUIState};
 use crossterm::style::Color;
 use porsmo::counter::Counter;
-use porsmo::pomodoro::{
-    PomodoroMode as Mode,
-    PomoConfig,
-    PomodoroSession as Session,
-};
+use porsmo::pomodoro::{PomoConfig, PomodoroMode as Mode, PomodoroSession as Session};
 
 use std::time::Duration;
 
 #[derive(Debug, Default)]
 pub struct PomoState {
-    pub mode:    PomoStateMode,
+    pub mode: PomoStateMode,
     pub session: Session,
-    pub config:  PomoConfig,
+    pub config: PomoConfig,
     pub alert: bool,
 }
 
 #[derive(Debug)]
 pub enum PomoStateMode {
-    Skip {
-        elapsed: Duration,
-    },
+    Skip { elapsed: Duration },
 
-    Running {
-        counter: Counter,
-    }
+    Running { counter: Counter },
 }
 
 impl Default for PomoStateMode {
@@ -44,7 +32,10 @@ impl Default for PomoStateMode {
 
 impl From<PomoConfig> for PomoState {
     fn from(config: PomoConfig) -> Self {
-        Self { config, ..Default::default() }
+        Self {
+            config,
+            ..Default::default()
+        }
     }
 }
 
@@ -70,9 +61,7 @@ impl PomoState {
         "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume, [Enter]: Next";
     const SKIP_CONTROLS: &str = "[Enter]: Yes, [Q/N]: No";
 
-    pub fn pomodoro_alert_message(
-        next_mode: Mode
-    ) -> (&'static str, &'static str) {
+    pub fn pomodoro_alert_message(next_mode: Mode) -> (&'static str, &'static str) {
         match next_mode {
             Mode::Work => ("Your break ended!", "Time for some work"),
             Mode::Break => ("Pomodoro ended!", "Time for a short break"),
@@ -82,14 +71,14 @@ impl PomoState {
 }
 
 impl CounterUIState for PomoState {
-    fn handle_command(self, command: Command,) -> Option<Self> {
+    fn handle_command(self, command: Command) -> Option<Self> {
         match command {
             Command::Quit => match self.mode {
                 PomoStateMode::Skip { elapsed } => {
                     let counter = Counter::from(elapsed).start();
                     let mode = PomoStateMode::Running { counter };
                     Some(Self { mode, ..self })
-                },
+                }
                 _ => None,
             },
 
@@ -98,25 +87,33 @@ impl CounterUIState for PomoState {
                     let counter = Counter::from(elapsed).start();
                     let mode = PomoStateMode::Running { counter };
                     Some(Self { mode, ..self })
-                },
+                }
                 _ => Some(self),
             },
 
             Command::Enter => match self.mode {
                 PomoStateMode::Running { counter }
-                if counter.elapsed() >= self.session.mode.get_time(&self.config)
-                    => {
+                    if counter.elapsed() >= self.session.mode.get_time(&self.config) =>
+                {
                     let counter = Counter::default().start();
                     let mode = PomoStateMode::Running { counter };
                     let session = self.session.next();
-                    Some(Self { mode, session, ..self })
+                    Some(Self {
+                        mode,
+                        session,
+                        ..self
+                    })
                 }
                 PomoStateMode::Skip { .. } => {
                     let counter = Counter::default().start();
                     let mode = PomoStateMode::Running { counter };
                     let session = self.session.next();
-                    Some(Self { mode, session, ..self })
-                },
+                    Some(Self {
+                        mode,
+                        session,
+                        ..self
+                    })
+                }
                 _ => Some(self),
             },
 
@@ -125,8 +122,12 @@ impl CounterUIState for PomoState {
                     let counter = Counter::default().start();
                     let mode = PomoStateMode::Running { counter };
                     let session = self.session.next();
-                    Some(Self { mode, session, ..self })
-                },
+                    Some(Self {
+                        mode,
+                        session,
+                        ..self
+                    })
+                }
                 _ => Some(self),
             },
 
@@ -135,45 +136,42 @@ impl CounterUIState for PomoState {
                     let counter = counter.stop();
                     let mode = PomoStateMode::Running { counter };
                     Some(Self { mode, ..self })
-                },
+                }
                 _ => Some(self),
-            }
+            },
 
             Command::Resume => match self.mode {
                 PomoStateMode::Running { counter } => {
                     let counter = counter.start();
                     let mode = PomoStateMode::Running { counter };
                     Some(Self { mode, ..self })
-                },
+                }
                 _ => Some(self),
-            }
+            },
 
             Command::Toggle => match self.mode {
                 PomoStateMode::Running { counter } => {
                     let counter = counter.toggle();
                     let mode = PomoStateMode::Running { counter };
                     Some(Self { mode, ..self })
-                },
+                }
                 _ => Some(self),
-            }
+            },
 
             Command::Skip => match self.mode {
                 PomoStateMode::Running { counter } => {
                     let elapsed = counter.elapsed();
                     let mode = PomoStateMode::Skip { elapsed };
                     Some(PomoState { mode, ..self })
-                },
+                }
                 _ => Some(self),
-            }
+            },
 
             _ => Some(self),
         }
     }
 
-    fn show(
-        &self,
-        terminal: &mut TerminalHandler,
-    ) -> Result<()> {
+    fn show(&self, terminal: &mut TerminalHandler) -> Result<()> {
         let target = self.target();
         let round_number = format!("Round: {}", self.session.number);
         match self.mode {
@@ -190,7 +188,7 @@ impl CounterUIState for PomoState {
                     .info(round_number)?
                     .info(Self::SKIP_CONTROLS)?
                     .flush()?;
-            },
+            }
             PomoStateMode::Running { counter } if counter.elapsed() < target => {
                 let time_left = target.saturating_sub(counter.elapsed());
 
@@ -202,12 +200,10 @@ impl CounterUIState for PomoState {
                     .info(Self::CONTROLS)?
                     .status(round_number)?
                     .flush()?;
-            },
+            }
             PomoStateMode::Running { counter } => {
                 let excess_time = counter.elapsed().saturating_sub(target);
-                let (_, message) = Self::pomodoro_alert_message(
-                    self.session.next().mode
-                );
+                let (_, message) = Self::pomodoro_alert_message(self.session.next().mode);
                 // TODO: Alert
 
                 terminal
@@ -218,7 +214,7 @@ impl CounterUIState for PomoState {
                     .info(Self::ENDING_CONTROLS)?
                     .status(message)?
                     .flush()?;
-            },
+            }
         }
         Ok(())
     }
@@ -239,9 +235,7 @@ impl PomoState {
 
 impl Alertable for PomoState {
     fn alert(&mut self) {
-        let (title, message) = Self::pomodoro_alert_message(
-            self.session.next().mode
-        );
+        let (title, message) = Self::pomodoro_alert_message(self.session.next().mode);
         alert(title, message);
     }
 

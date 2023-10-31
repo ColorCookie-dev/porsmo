@@ -8,13 +8,19 @@ pub struct Counter {
 
 impl Default for Counter {
     fn default() -> Self {
-        Self { start: Some(Instant::now()), elapsed: Duration::ZERO }
+        Self {
+            start: Some(Instant::now()),
+            elapsed: Duration::ZERO,
+        }
     }
 }
 
 impl From<Duration> for Counter {
     fn from(elapsed: Duration) -> Self {
-        Self { start: None, elapsed }
+        Self {
+            start: None,
+            elapsed,
+        }
     }
 }
 
@@ -50,9 +56,7 @@ impl Counter {
     pub fn checked_time_left(&self, initial: Duration) -> DoubleEndedDuration {
         match initial.checked_sub(self.elapsed()) {
             Some(x) => DoubleEndedDuration::Positive(x),
-            None    => DoubleEndedDuration::Negative(
-                self.elapsed().saturating_sub(initial)
-            ),
+            None => DoubleEndedDuration::Negative(self.elapsed().saturating_sub(initial)),
         }
     }
 
@@ -64,7 +68,10 @@ impl Counter {
     }
 
     pub fn stop(self) -> Self {
-        Self { start: None, elapsed: self.elapsed() }
+        Self {
+            start: None,
+            elapsed: self.elapsed(),
+        }
     }
 
     pub fn elapsed(self) -> Duration {
@@ -76,7 +83,7 @@ impl Counter {
     pub fn toggle(self) -> Self {
         match self.start {
             Some(_) => self.stop(),
-            None    => self.start(),
+            None => self.start(),
         }
     }
 }

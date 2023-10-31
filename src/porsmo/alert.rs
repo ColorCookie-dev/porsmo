@@ -1,6 +1,6 @@
+use notify_rust::Notification;
 use rodio::{Decoder, OutputStream, Sink};
 use std::{io::Cursor, thread};
-use notify_rust::Notification;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AlertError {
@@ -11,8 +11,7 @@ pub enum AlertError {
     SoundError(#[from] SoundError),
 }
 
-pub fn notify_default(title: impl AsRef<str>, message: impl AsRef<str>)
--> Result<(), AlertError> {
+pub fn notify_default(title: impl AsRef<str>, message: impl AsRef<str>) -> Result<(), AlertError> {
     Notification::new()
         .appname("Porsmo")
         .summary(title.as_ref())
@@ -54,17 +53,15 @@ impl From<rodio::PlayError> for SoundError {
 }
 
 pub fn play_bell() -> Result<(), SoundError> {
-    let (_stream, stream_handle) =
-        OutputStream::try_default()?;
+    let (_stream, stream_handle) = OutputStream::try_default()?;
 
     // let volume = 0.5;
     let audio = Decoder::new(Cursor::new(include_bytes!("notify_end.wav")))?;
-    Sink::try_new(&stream_handle)
-        .map(|sink| {
-            sink.append(audio);
-            // sink.set_volume(volume);
-            sink.sleep_until_end();
-        })?;
+    Sink::try_new(&stream_handle).map(|sink| {
+        sink.append(audio);
+        // sink.set_volume(volume);
+        sink.sleep_until_end();
+    })?;
 
     Ok(())
 }

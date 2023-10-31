@@ -21,4 +21,3 @@ pub enum PorsmoError {
     #[error(transparent)]
     CrosstermError(#[from] crossterm::ErrorKind),
 }
-

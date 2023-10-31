@@ -1,5 +1,5 @@
-use std::time::Duration;
 use super::PomoConfig;
+use std::time::Duration;
 
 #[derive(Clone, Copy, Debug)]
 pub enum PomodoroMode {

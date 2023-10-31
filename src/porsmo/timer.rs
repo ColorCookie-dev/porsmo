@@ -1,11 +1,7 @@
-use crate::{prelude::*, CounterUIState, Alertable};
 use crate::alert::alert;
 use crate::terminal::running_color;
-use crate::{
-    format::fmt_time,
-    input::Command,
-    terminal::TerminalHandler,
-};
+use crate::{format::fmt_time, input::Command, terminal::TerminalHandler};
+use crate::{prelude::*, Alertable, CounterUIState};
 use porsmo::counter::Counter;
 use std::time::Duration;
 
@@ -22,7 +18,7 @@ impl TimerState {
         Self {
             counter,
             target,
-            alert: false
+            alert: false,
         }
     }
 }
@@ -55,12 +51,18 @@ impl CounterUIState for TimerState {
     fn handle_command(self, command: Command) -> Option<Self> {
         match command {
             Command::Quit => None,
-            Command::Pause =>
-                Some(Self { counter: self.counter.stop(), ..self}),
-            Command::Resume =>
-                Some(Self { counter: self.counter.start(), ..self}),
-            Command::Toggle | Command::Enter =>
-                Some(Self { counter: self.counter.toggle(), ..self}),
+            Command::Pause => Some(Self {
+                counter: self.counter.stop(),
+                ..self
+            }),
+            Command::Resume => Some(Self {
+                counter: self.counter.start(),
+                ..self
+            }),
+            Command::Toggle | Command::Enter => Some(Self {
+                counter: self.counter.toggle(),
+                ..self
+            }),
             _ => Some(self),
         }
     }

@@ -8,7 +8,7 @@ use clap::{Parser, Subcommand};
     name = "Porsmo",
     author = "HellsNoah <hellsnoah@protonmail.com>",
     version,
-    about,
+    about
 )]
 pub struct Cli {
     #[command(subcommand, name = "mode")]
@@ -57,4 +57,3 @@ pub enum PomoMode {
         long_break: Duration,
     },
 }
-
