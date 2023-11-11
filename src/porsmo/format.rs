@@ -1,91 +1,40 @@
-use std::{num::ParseIntError, time::Duration};
+use std::time::Duration;
 
-pub fn fmt_time(time: u64) -> String {
-    const MIN: u64 = 60;
-    const HOUR: u64 = 60 * MIN;
-    const DAY: u64 = 24 * HOUR;
+use crate::prelude::*;
 
-    match time {
-        secs if secs < MIN => format!("{secs}s"),
-        secs if secs < HOUR => format!(
-            "{}m {}",
-            secs.div_euclid(MIN),
-            fmt_time(secs.rem_euclid(MIN))
-        ),
-        secs if secs < DAY => format!(
-            "{}h {}",
-            secs.div_euclid(HOUR),
-            fmt_time(secs.rem_euclid(HOUR))
-        ),
-        secs => format!(
-            "{}days {}",
-            secs.div_euclid(DAY),
-            fmt_time(secs.rem_euclid(DAY))
-        ),
-    }
+pub fn format_duration(dur: &Duration) -> String {
+    let total_secs = dur.as_secs();
+    let secs = total_secs % 60;
+    let mins = ((total_secs - secs) % (60 * 60)) / 60;
+    let hours = (total_secs - mins * 60 - secs) / (60 * 60);
+    format!("{hours}h {mins}m {secs}s")
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum TimeParseError {
-    #[error(transparent)]
-    ParseIntError(#[from] ParseIntError),
+pub fn parse_duration(text: &str) -> Result<Duration> {
+    let (hours, text) = match text.split_once('h') {
+        Some((hours, rest)) => {
+            let hours = hours.parse::<u64>()?;
+            (Duration::from_secs(hours * 3600), rest)
+        },
+        None => (Duration::ZERO, text),
+    };
 
-    #[error("Bad number of `:`")]
-    BadNumberOfSeparators,
-}
+    let (mins, text) = match text.split_once('m') {
+        Some((mins, text)) => {
+            let mins = mins.parse::<u64>()?;
+            (Duration::from_secs(mins * 60), text)
+        },
+        None => (Duration::ZERO, text),
+    };
 
-pub fn parse_time(time_str: &str) -> Result<Duration, TimeParseError> {
-    let mut secs = 0u64;
+    let (secs, _) = match text.split_once('s') {
+        Some((secs, "")) => {
+            let secs = secs.parse::<u64>()?;
+            (Duration::from_secs(secs), text)
+        },
+        None if text == "" => (Duration::ZERO, ""),
+        _ => return Err(PorsmoError::WrongFormatError),
+    };
 
-    for (i, e) in time_str.split(':').rev().enumerate() {
-        if e.is_empty() {
-            continue;
-        }
-
-        let en = e.parse::<u64>()?;
-
-        if i == 0 {
-            secs += en;
-        } else if i == 1 {
-            secs += en * 60;
-        } else if i == 2 {
-            secs += en * 60 * 60;
-        } else if i == 3 {
-            secs += en * 3600 * 24;
-        } else {
-            return Err(TimeParseError::BadNumberOfSeparators);
-        }
-    }
-
-    Ok(Duration::from_secs(secs))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_parse_time() -> Result<(), TimeParseError> {
-        let ok_cases = vec![
-            ("", 0),
-            (":", 0),
-            ("::10", 10),
-            ("1020", 1020),
-            ("2:000092", 2 * 60 + 92),
-            ("2:", 2 * 60),
-            ("2:2:2", (2 * 60 + 2) * 60 + 2),
-            ("1:::", 1 * 24 * 60 * 60),
-        ];
-
-        for (inp, out) in ok_cases.iter() {
-            assert_eq!(parse_time(inp)?, *out);
-        }
-
-        let err_cases = vec!["1::::", "kjdf:kjfk", ":kjfk", "1:4k:5"];
-
-        for inp in err_cases.iter() {
-            assert!(parse_time(inp).is_err());
-        }
-
-        Ok(())
-    }
+    Ok(hours + mins + secs)
 }

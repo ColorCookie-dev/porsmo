@@ -1,3 +1,5 @@
+use std::num::ParseIntError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum PorsmoError {
     #[error("IO Error: {0}")]
@@ -17,6 +19,12 @@ pub enum PorsmoError {
 
     #[error("Failed to print to screen")]
     FailedPrint(#[source] crossterm::ErrorKind),
+
+    #[error("Wrong format for time")]
+    WrongFormatError,
+
+    #[error(transparent)]
+    ParseIntError(#[from] ParseIntError),
 
     #[error(transparent)]
     CrosstermError(#[from] crossterm::ErrorKind),

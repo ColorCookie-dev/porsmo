@@ -1,6 +1,6 @@
 use crate::alert::alert;
 use crate::terminal::running_color;
-use crate::{format::fmt_time, input::Command, terminal::TerminalHandler};
+use crate::{format::format_duration, input::Command, terminal::TerminalHandler};
 use crate::{prelude::*, Alertable, CounterUIState};
 use crossterm::style::Color;
 use porsmo::counter::Counter;
@@ -101,6 +101,7 @@ impl CounterUIState for PomoState {
                     Some(Self {
                         mode,
                         session,
+                        alert: false,
                         ..self
                     })
                 }
@@ -111,6 +112,7 @@ impl CounterUIState for PomoState {
                     Some(Self {
                         mode,
                         session,
+                        alert: false,
                         ..self
                     })
                 }
@@ -125,6 +127,7 @@ impl CounterUIState for PomoState {
                     Some(Self {
                         mode,
                         session,
+                        alert: false,
                         ..self
                     })
                 }
@@ -196,7 +199,7 @@ impl CounterUIState for PomoState {
                     .clear()?
                     .info(Self::title(self.session.mode))?
                     .set_foreground_color(running_color(counter.started()))?
-                    .print(fmt_time(time_left.as_secs()))?
+                    .print(format_duration(&time_left))?
                     .info(Self::CONTROLS)?
                     .status(round_number)?
                     .flush()?;
@@ -210,7 +213,7 @@ impl CounterUIState for PomoState {
                     .clear()?
                     .info(Self::break_title(self.session.next().mode))?
                     .set_foreground_color(running_color(counter.started()))?
-                    .print(format_args!("+{}", fmt_time(excess_time.as_secs())))?
+                    .print(format_args!("+{}", format_duration(&excess_time)))?
                     .info(Self::ENDING_CONTROLS)?
                     .status(message)?
                     .flush()?;

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::terminal::running_color;
-use crate::{format::fmt_time, input::Command, terminal::TerminalHandler};
+use crate::{format::format_duration, input::Command, terminal::TerminalHandler};
 use crate::{prelude::*, CounterUIState};
 use porsmo::counter::Counter as Stopwatch;
 
@@ -23,7 +23,7 @@ impl CounterUIState for StopwatchState {
             .clear()?
             .info("Stopwatch")?
             .set_foreground_color(running_color(self.counter.started()))?
-            .print(fmt_time(self.counter.elapsed().as_secs()))?
+            .print(format_duration(&self.counter.elapsed()))?
             .info("[Q]: quit, [Space]: pause/resume")?
             .flush()
     }

@@ -1,6 +1,6 @@
 use crate::alert::alert;
 use crate::terminal::running_color;
-use crate::{format::fmt_time, input::Command, terminal::TerminalHandler};
+use crate::{format::format_duration, input::Command, terminal::TerminalHandler};
 use crate::{prelude::*, Alertable, CounterUIState};
 use porsmo::counter::Counter;
 use std::time::Duration;
@@ -32,7 +32,7 @@ impl CounterUIState for TimerState {
                 .clear()?
                 .info("Timer")?
                 .set_foreground_color(running_color(self.counter.started()))?
-                .print(fmt_time(time_left.as_secs()))?
+                .print(format_duration(&time_left))?
                 .info("[Q]: quit, [Space]: pause/resume")?
                 .flush()?;
         } else {
@@ -41,7 +41,7 @@ impl CounterUIState for TimerState {
                 .clear()?
                 .info("Timer Has Ended")?
                 .set_foreground_color(running_color(self.counter.started()))?
-                .print(format_args!("+{}", fmt_time(excess_time.as_secs())))?
+                .print(format_args!("+{}", format_duration(&excess_time)))?
                 .info("[Q]: quit, [Space]: pause/resume")?
                 .flush()?;
         }
@@ -85,7 +85,7 @@ impl Alertable for TimerState {
         let title = "The timer has ended!";
         let message = format!(
             "Your Timer of {initial} has ended",
-            initial = fmt_time(self.target.as_secs())
+            initial = format_duration(&self.target)
         );
 
         alert(title, message);
