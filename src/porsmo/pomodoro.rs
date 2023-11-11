@@ -176,7 +176,7 @@ impl CounterUIState for PomoState {
 
     fn show(&self, terminal: &mut TerminalHandler) -> Result<()> {
         let target = self.target();
-        let round_number = format!("Round: {}", self.session.number);
+        let round_number = format!("Session: {}", self.session.number);
         match self.mode {
             PomoStateMode::Skip { .. } => {
                 let (color, skip_to) = match self.session.next().mode {
