@@ -4,12 +4,7 @@ use crate::format::parse_duration;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(
-    name = "Porsmo",
-    author = "HellsNoah <hellsnoah@protonmail.com>",
-    version,
-    about
-)]
+#[command(author, version, about)]
 pub struct Cli {
     #[command(subcommand, name = "mode")]
     pub mode: Option<CounterMode>,
