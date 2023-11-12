@@ -23,10 +23,9 @@ pub struct TimerState {
 }
 
 impl TimerState {
-    pub fn new(start_time: Duration, target: Duration) -> Self {
-        let counter = Counter::from(start_time).start();
+    pub fn new(target: Duration) -> Self {
         Self {
-            counter,
+            counter: Counter::default(),
             target,
             alert: false,
         }
