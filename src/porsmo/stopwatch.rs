@@ -81,7 +81,7 @@ impl Stopwatch {
             None => self.elapsed_before,
         }
     }
-
+    
     pub fn started(&self) -> bool {
         if matches!(self.start_time, None) {
             false

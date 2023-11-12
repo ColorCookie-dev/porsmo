@@ -15,7 +15,7 @@ impl Default for PomodoroMode {
 }
 
 impl PomodoroMode {
-    pub fn get_time(&self, config: &PomoConfig) -> Duration {
+    pub fn current_target(&self, config: &PomoConfig) -> Duration {
         match self {
             Self::Work => config.work_time,
             Self::Break => config.break_time,

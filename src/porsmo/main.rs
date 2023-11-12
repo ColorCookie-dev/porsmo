@@ -12,7 +12,7 @@ mod timer;
 use clap::Parser;
 use cli::{Cli, CounterMode, PomoMode};
 use input::{get_event, Command, TIMEOUT};
-use pomodoro::PomoState;
+use pomodoro::pomodoro;
 use porsmo::pomodoro::PomoConfig;
 use prelude::*;
 use std::io::Write;
@@ -25,27 +25,21 @@ fn main() -> Result<()> {
     let mut terminal = TerminalHandler::new()?;
     let stdout = terminal.stdout();
     match args.mode {
-        Some(CounterMode::Stopwatch { start_time }) => {
-            stopwatch(stdout, start_time)?;
-        }
-        Some(CounterMode::Timer { target }) => {
-            timer(stdout, target)?;
-        }
-        Some(CounterMode::Pomodoro { mode: PomoMode::Short }) => {
-            PomoState::from(PomoConfig::short()).run_alerted(stdout)?;
-        }
-        Some(CounterMode::Pomodoro { mode: PomoMode::Long }) => {
-            PomoState::from(PomoConfig::long()).run_alerted(stdout)?;
-        }
+        Some(CounterMode::Stopwatch { start_time }) =>
+            stopwatch(stdout, start_time)?,
+        Some(CounterMode::Timer { target }) =>
+            timer(stdout, target)?,
+        Some(CounterMode::Pomodoro { mode: PomoMode::Short }) =>
+            pomodoro(stdout, &PomoConfig::short())?,
+        Some(CounterMode::Pomodoro { mode: PomoMode::Long }) =>
+            pomodoro(stdout, &PomoConfig::long())?,
         Some(CounterMode::Pomodoro {
             mode: PomoMode::Custom { work_time, break_time, long_break, },
-        }) => {
-            let config = PomoConfig::new(work_time, break_time, long_break);
-            PomoState::from(config).run_alerted(stdout)?;
-        }
-        None => {
-            PomoState::from(PomoConfig::short()).run_alerted(stdout)?;
-        }
+        }) => pomodoro(
+            stdout,
+            &PomoConfig::new(work_time, break_time, long_break)
+        )?,
+        None => pomodoro(stdout, &PomoConfig::short())?,
     }
     Ok(())
 }
