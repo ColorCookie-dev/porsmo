@@ -17,7 +17,7 @@ pub enum CounterMode {
     Stopwatch {
         #[arg(
             value_parser = parse_duration,
-            default_value = "25m",
+            default_value = "0s",
             value_name = "time"
         )]
         /// start from a particular time: example values: 30m 20m 40m 2h25m30s
