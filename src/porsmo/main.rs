@@ -32,19 +32,14 @@ fn main() -> Result<()> {
             let start_time = Duration::ZERO;
             TimerState::new(start_time, target).run_alerted(stdout)?;
         }
-        Some(CounterMode::Pomodoro { mode: Some(PomoMode::Short) | None }) => {
+        Some(CounterMode::Pomodoro { mode: PomoMode::Short }) => {
             PomoState::from(PomoConfig::short()).run_alerted(stdout)?;
         }
-        Some(CounterMode::Pomodoro { mode: Some(PomoMode::Long) }) => {
+        Some(CounterMode::Pomodoro { mode: PomoMode::Long }) => {
             PomoState::from(PomoConfig::long()).run_alerted(stdout)?;
         }
         Some(CounterMode::Pomodoro {
-            mode:
-                Some(PomoMode::Custom {
-                    work_time,
-                    break_time,
-                    long_break,
-                }),
+            mode: PomoMode::Custom { work_time, break_time, long_break, },
         }) => {
             let config = PomoConfig::new(work_time, break_time, long_break);
             PomoState::from(config).run_alerted(stdout)?;

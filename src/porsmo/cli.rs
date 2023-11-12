@@ -34,7 +34,7 @@ pub enum CounterMode {
     #[command(name = "pomodoro", alias = "p")]
     Pomodoro {
         #[clap(subcommand, name = "mode")]
-        mode: Option<PomoMode>,
+        mode: PomoMode,
     },
 }
 
