@@ -20,29 +20,22 @@ use stopwatch::StopwatchState;
 use terminal::TerminalHandler;
 use timer::TimerState;
 
-const DEFAULT_TIMER_TARGET: Duration = Duration::from_secs(25 * 60);
-
 fn main() -> Result<()> {
     let args = Cli::parse();
     let mut terminal = TerminalHandler::new()?;
     let stdout = terminal.stdout();
     match args.mode {
         Some(CounterMode::Stopwatch { start_time }) => {
-            StopwatchState::new(start_time.unwrap_or(Duration::ZERO)).run(stdout)?;
+            StopwatchState::new(start_time).run(stdout)?;
         }
         Some(CounterMode::Timer { target }) => {
             let start_time = Duration::ZERO;
-            let target = target.unwrap_or(DEFAULT_TIMER_TARGET);
             TimerState::new(start_time, target).run_alerted(stdout)?;
         }
-        Some(CounterMode::Pomodoro {
-            mode: Some(PomoMode::Short) | None,
-        }) => {
+        Some(CounterMode::Pomodoro { mode: Some(PomoMode::Short) | None }) => {
             PomoState::from(PomoConfig::short()).run_alerted(stdout)?;
         }
-        Some(CounterMode::Pomodoro {
-            mode: Some(PomoMode::Long),
-        }) => {
+        Some(CounterMode::Pomodoro { mode: Some(PomoMode::Long) }) => {
             PomoState::from(PomoConfig::long()).run_alerted(stdout)?;
         }
         Some(CounterMode::Pomodoro {

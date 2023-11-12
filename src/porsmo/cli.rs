@@ -20,15 +20,19 @@ pub enum CounterMode {
     /// alias: s, stopwatch, counts up until you tell it to stop
     #[command(name = "stopwatch", alias = "s")]
     Stopwatch {
-        #[arg(value_parser = parse_duration, value_name = "time")]
+        #[arg(
+            value_parser = parse_duration,
+            default_value = "25m",
+            value_name = "time"
+        )]
         /// Lets you start timer from a particular time
-        start_time: Option<Duration>,
+        start_time: Duration,
     },
     /// alias: t, timer, counts down until you tell it to stop, or it ends
     #[command(name = "timer", alias = "t")]
     Timer {
         #[arg(value_parser = parse_duration, value_name = "time")]
-        target: Option<Duration>,
+        target: Duration,
     },
     /// alias: p, pomodoro, for all you productivity needs (default)
     #[command(name = "pomodoro", alias = "p")]
