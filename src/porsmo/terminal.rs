@@ -9,7 +9,7 @@ use crossterm::{
 };
 use std::io::{stdout, Stdout};
 
-pub struct TerminalHandler(pub Stdout);
+pub struct TerminalHandler(Stdout);
 
 impl TerminalHandler {
     pub fn new() -> Result<Self> {
