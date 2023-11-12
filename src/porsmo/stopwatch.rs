@@ -116,7 +116,7 @@ impl Stopwatch {
     }
 }
 
-pub fn stopwatch_ui(out: &mut impl Write, start_time: Duration) -> Result<()> {
+pub fn stopwatch(out: &mut impl Write, start_time: Duration) -> Result<()> {
     let mut counter = Stopwatch::new(Some(Instant::now()), start_time);
     loop {
         queue!(

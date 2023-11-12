@@ -16,7 +16,7 @@ use pomodoro::PomoState;
 use porsmo::pomodoro::PomoConfig;
 use prelude::*;
 use std::io::Write;
-use stopwatch::stopwatch_ui;
+use stopwatch::stopwatch;
 use terminal::TerminalHandler;
 use timer::TimerState;
 
@@ -26,7 +26,7 @@ fn main() -> Result<()> {
     let stdout = terminal.stdout();
     match args.mode {
         Some(CounterMode::Stopwatch { start_time }) => {
-            stopwatch_ui(stdout, start_time)?;
+            stopwatch(stdout, start_time)?;
         }
         Some(CounterMode::Timer { target }) => {
             TimerState::new(target).run_alerted(stdout)?;
