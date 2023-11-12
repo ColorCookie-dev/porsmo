@@ -56,7 +56,7 @@ impl CounterUIState for StopwatchState {
     }
 }
 
-struct Stopwatch {
+pub struct Stopwatch {
     start_time: Option<Instant>,
     elapsed_before: Duration,
 }
@@ -71,18 +71,18 @@ impl Default for Stopwatch {
 }
 
 impl Stopwatch {
-    fn new(start_time: Option<Instant>, elapsed_before: Duration) -> Self {
+    pub fn new(start_time: Option<Instant>, elapsed_before: Duration) -> Self {
         Self { start_time, elapsed_before }
     }
 
-    fn elapsed(&self) -> Duration {
+    pub fn elapsed(&self) -> Duration {
         match self.start_time {
             Some(start_time) => self.elapsed_before + start_time.elapsed(),
             None => self.elapsed_before,
         }
     }
 
-    fn started(&self) -> bool {
+    pub fn started(&self) -> bool {
         if matches!(self.start_time, None) {
             false
         } else {
@@ -90,20 +90,20 @@ impl Stopwatch {
         }
     }
 
-    fn start(&mut self) {
+    pub fn start(&mut self) {
         if matches!(self.start_time, None) {
             self.start_time = Some(Instant::now());
         }
     }
 
-    fn stop(&mut self) {
+    pub fn stop(&mut self) {
         if let Some(start_time) = self.start_time {
             self.elapsed_before += start_time.elapsed();
             self.start_time = None;
         }
     }
 
-    fn toggle(&mut self) {
+    pub fn toggle(&mut self) {
         match self.start_time {
             Some(start_time) => {
                 self.elapsed_before += start_time.elapsed();

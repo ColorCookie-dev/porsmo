@@ -18,7 +18,7 @@ use prelude::*;
 use std::io::Write;
 use stopwatch::stopwatch;
 use terminal::TerminalHandler;
-use timer::TimerState;
+use timer::timer;
 
 fn main() -> Result<()> {
     let args = Cli::parse();
@@ -29,7 +29,7 @@ fn main() -> Result<()> {
             stopwatch(stdout, start_time)?;
         }
         Some(CounterMode::Timer { target }) => {
-            TimerState::new(target).run_alerted(stdout)?;
+            timer(stdout, target)?;
         }
         Some(CounterMode::Pomodoro { mode: PomoMode::Short }) => {
             PomoState::from(PomoConfig::short()).run_alerted(stdout)?;
