@@ -1,16 +1,13 @@
 use crate::{error::PorsmoError, prelude::*};
 use crossterm::{
-    cursor::{MoveTo, MoveToNextLine},
+    cursor::MoveTo,
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
-    style::{Color, Print, SetForegroundColor},
+    style::Color,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     terminal::{Clear, ClearType},
 };
-use std::{
-    fmt::Display,
-    io::{stdout, Stdout, Write},
-};
+use std::io::{stdout, Stdout};
 
 pub struct TerminalHandler(pub Stdout);
 
@@ -33,38 +30,6 @@ impl TerminalHandler {
 
     pub fn stdout(&mut self) -> &mut Stdout {
         &mut self.0
-    }
-
-    pub fn clear(&mut self) -> Result<&mut Self> {
-        let stdout = &mut self.0;
-        execute!(stdout, MoveTo(0, 0), Clear(ClearType::All),).map_err(PorsmoError::FailedClear)?;
-
-        stdout.flush().map_err(PorsmoError::FlushError)?;
-        Ok(self)
-    }
-
-    pub fn set_foreground_color(&mut self, color: Color) -> Result<&mut Self> {
-        execute!(self.stdout(), SetForegroundColor(color),)
-            .map_err(PorsmoError::ForegroundColorSetFailed)?;
-        Ok(self)
-    }
-
-    pub fn print(&mut self, text: impl Display) -> Result<&mut Self> {
-        execute!(self.stdout(), Print(text), MoveToNextLine(1),)
-            .map_err(PorsmoError::FailedPrint)?;
-        Ok(self)
-    }
-
-    pub fn info(&mut self, text: impl Display) -> Result<&mut Self> {
-        self.set_foreground_color(Color::Magenta)?.print(text)
-    }
-
-    pub fn status(&mut self, text: impl Display) -> Result<&mut Self> {
-        self.set_foreground_color(Color::Yellow)?.print(text)
-    }
-
-    pub fn flush(&mut self) -> Result<()> {
-        self.stdout().flush().map_err(PorsmoError::FlushError)
     }
 }
 

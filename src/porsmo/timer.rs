@@ -1,9 +1,19 @@
 use crate::alert::alert;
 use crate::terminal::running_color;
-use crate::{format::format_duration, input::Command, terminal::TerminalHandler};
+use crate::{format::format_duration, input::Command};
 use crate::{prelude::*, Alertable, CounterUIState};
+use crossterm::terminal::{Clear, ClearType};
 use porsmo::counter::Counter;
+use std::io::Write;
 use std::time::Duration;
+use crossterm::{
+    queue,
+    style::{Stylize, Print},
+    cursor::{
+        MoveToNextLine,
+        MoveTo,
+    },
+};
 
 #[derive(Debug)]
 pub struct TimerState {
@@ -24,27 +34,40 @@ impl TimerState {
 }
 
 impl CounterUIState for TimerState {
-    fn show(&self, terminal: &mut TerminalHandler) -> Result<()> {
+    fn show(&self, out: &mut impl Write) -> Result<()> {
         let elapsed = self.counter.elapsed();
         if elapsed < self.target {
             let time_left = self.target.saturating_sub(elapsed);
-            terminal
-                .clear()?
-                .info("Timer")?
-                .set_foreground_color(running_color(self.counter.started()))?
-                .print(format_duration(&time_left))?
-                .info("[Q]: quit, [Space]: pause/resume")?
-                .flush()?;
+
+            queue!(
+                out,
+                MoveTo(0, 0),
+                Clear(ClearType::All),
+                Print("Timer"), MoveToNextLine(1),
+                Print(format_duration(&time_left)
+                      .with(running_color(self.counter.started()))),
+                MoveToNextLine(1),
+                Print("[Q]: quit, [Space]: pause/resume"),
+                MoveToNextLine(1)
+            )?;
         } else {
             let excess_time = elapsed.saturating_sub(self.target);
-            terminal
-                .clear()?
-                .info("Timer Has Ended")?
-                .set_foreground_color(running_color(self.counter.started()))?
-                .print(format_args!("+{}", format_duration(&excess_time)))?
-                .info("[Q]: quit, [Space]: pause/resume")?
-                .flush()?;
+            queue!(
+                out,
+                MoveTo(0, 0),
+                Clear(ClearType::All),
+                Print("Timer has ended"), MoveToNextLine(1),
+                Print(
+                    format_args!(
+                        "+{}",
+                        format_duration(&excess_time)
+                            .with(running_color(self.counter.started()))
+                    )
+                ), MoveToNextLine(1),
+                Print("[Q]: quit, [Space]: pause/resume"), MoveToNextLine(1)
+            )?;
         }
+        out.flush()?;
         Ok(())
     }
 

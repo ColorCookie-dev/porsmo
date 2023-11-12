@@ -1,11 +1,19 @@
 use crate::alert::alert;
 use crate::terminal::running_color;
-use crate::{format::format_duration, input::Command, terminal::TerminalHandler};
+use crate::{format::format_duration, input::Command};
 use crate::{prelude::*, Alertable, CounterUIState};
-use crossterm::style::Color;
+use crossterm::cursor::{MoveTo, MoveToNextLine};
+use crossterm::style::Print;
+use crossterm::terminal::{Clear, ClearType};
+use crossterm::{
+    style::Color,
+    style::Stylize,
+    queue,
+};
 use porsmo::counter::Counter;
 use porsmo::pomodoro::{PomoConfig, PomodoroMode as Mode, PomodoroSession as Session};
 
+use std::io::Write;
 use std::time::Duration;
 
 #[derive(Debug, Default)]
@@ -174,7 +182,7 @@ impl CounterUIState for PomoState {
         }
     }
 
-    fn show(&self, terminal: &mut TerminalHandler) -> Result<()> {
+    fn show(&self, out: &mut impl Write) -> Result<()> {
         let target = self.target();
         let round_number = format!("Session: {}", self.session.number);
         match self.mode {
@@ -184,41 +192,53 @@ impl CounterUIState for PomoState {
                     Mode::Break => (Color::Green, "skip to break?"),
                     Mode::LongBreak => (Color::Green, "skip to long break?"),
                 };
-                terminal
-                    .clear()?
-                    .set_foreground_color(color)?
-                    .print(skip_to)?
-                    .info(round_number)?
-                    .info(Self::SKIP_CONTROLS)?
-                    .flush()?;
+                queue!(
+                    out,
+                    MoveTo(0, 0),
+                    Clear(ClearType::All),
+                    Print(skip_to.with(color)), MoveToNextLine(1),
+                    Print(round_number), MoveToNextLine(1),
+                    Print(Self::SKIP_CONTROLS)
+                )?;
             }
             PomoStateMode::Running { counter } if counter.elapsed() < target => {
                 let time_left = target.saturating_sub(counter.elapsed());
 
-                terminal
-                    .clear()?
-                    .info(Self::title(self.session.mode))?
-                    .set_foreground_color(running_color(counter.started()))?
-                    .print(format_duration(&time_left))?
-                    .info(Self::CONTROLS)?
-                    .status(round_number)?
-                    .flush()?;
+                queue!(
+                    out,
+                    MoveTo(0, 0),
+                    Clear(ClearType::All),
+                    Print(Self::title(self.session.mode)), MoveToNextLine(1),
+                    Print(
+                        format_duration(&time_left)
+                            .with(running_color(counter.started())),
+                    ), MoveToNextLine(1),
+                    Print(Self::CONTROLS), MoveToNextLine(1),
+                    Print(round_number),
+                )?;
             }
             PomoStateMode::Running { counter } => {
                 let excess_time = counter.elapsed().saturating_sub(target);
                 let (_, message) = Self::pomodoro_alert_message(self.session.next().mode);
-                // TODO: Alert
 
-                terminal
-                    .clear()?
-                    .info(Self::break_title(self.session.next().mode))?
-                    .set_foreground_color(running_color(counter.started()))?
-                    .print(format_args!("+{}", format_duration(&excess_time)))?
-                    .info(Self::ENDING_CONTROLS)?
-                    .status(message)?
-                    .flush()?;
+                queue!(
+                    out,
+                    MoveTo(0, 0),
+                    Clear(ClearType::All),
+                    Print(Self::break_title(self.session.next().mode)), MoveToNextLine(1),
+                    Print(
+                        format_args!(
+                            "+{}",
+                            format_duration(&excess_time)
+                                .with(running_color(counter.started())),
+                        ),
+                    ), MoveToNextLine(1),
+                    Print(Self::ENDING_CONTROLS), MoveToNextLine(1),
+                    Print(message),
+                )?;
             }
         }
+        out.flush()?;
         Ok(())
     }
 }
