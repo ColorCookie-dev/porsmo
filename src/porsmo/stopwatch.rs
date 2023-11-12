@@ -1,15 +1,15 @@
 use std::time::Instant;
-use std::{time::Duration, io::Write};
+use std::{io::Write, time::Duration};
 
 use crate::input::{get_event, TIMEOUT};
 use crate::terminal::running_color;
 use crate::{format::format_duration, input::Command};
 use crate::{prelude::*, CounterUIState};
 use crossterm::{
+    cursor::{MoveTo, MoveToNextLine},
     queue,
-    cursor::{ MoveTo, MoveToNextLine, },
-    terminal::{ ClearType, Clear, },
-    style::{ Print, Stylize, },
+    style::{Print, Stylize},
+    terminal::{Clear, ClearType},
 };
 use porsmo::counter::Counter;
 
@@ -32,11 +32,13 @@ impl CounterUIState for StopwatchState {
             out,
             MoveTo(0, 0),
             Clear(ClearType::All),
-            Print("Stopwatch"), MoveToNextLine(1),
+            Print("Stopwatch"),
+            MoveToNextLine(1),
             Print(
                 format_duration(&self.counter.elapsed())
                     .with(running_color(self.counter.started()))
-            ), MoveToNextLine(1),
+            ),
+            MoveToNextLine(1),
             Print(CONTROL),
         )?;
         out.flush()?;
@@ -65,14 +67,17 @@ impl Default for Stopwatch {
     fn default() -> Self {
         Self {
             start_time: Some(Instant::now()),
-            elapsed_before: Duration::ZERO
+            elapsed_before: Duration::ZERO,
         }
     }
 }
 
 impl Stopwatch {
     pub fn new(start_time: Option<Instant>, elapsed_before: Duration) -> Self {
-        Self { start_time, elapsed_before }
+        Self {
+            start_time,
+            elapsed_before,
+        }
     }
 
     pub fn elapsed(&self) -> Duration {
@@ -81,7 +86,7 @@ impl Stopwatch {
             None => self.elapsed_before,
         }
     }
-    
+
     pub fn started(&self) -> bool {
         if matches!(self.start_time, None) {
             false
@@ -108,7 +113,7 @@ impl Stopwatch {
             Some(start_time) => {
                 self.elapsed_before += start_time.elapsed();
                 self.start_time = None;
-            },
+            }
             None => {
                 self.start_time = Some(Instant::now());
             }
@@ -123,11 +128,10 @@ pub fn stopwatch(out: &mut impl Write, start_time: Duration) -> Result<()> {
             out,
             MoveTo(0, 0),
             Clear(ClearType::All),
-            Print("Stopwatch"), MoveToNextLine(1),
-            Print(
-                format_duration(&counter.elapsed())
-                    .with(running_color(counter.started()))
-            ), MoveToNextLine(1),
+            Print("Stopwatch"),
+            MoveToNextLine(1),
+            Print(format_duration(&counter.elapsed()).with(running_color(counter.started()))),
+            MoveToNextLine(1),
             Print("[Q]: quit, [Space]: pause/resume"),
         )?;
         out.flush()?;

@@ -7,7 +7,11 @@ use crate::{prelude::*, Alertable, CounterUIState};
 use crossterm::cursor::{MoveTo, MoveToNextLine};
 use crossterm::style::Print;
 use crossterm::terminal::{Clear, ClearType};
-use crossterm::{queue, style::Color, style::Stylize};
+use crossterm::{
+    style::Color,
+    style::Stylize,
+    queue,
+};
 use porsmo::counter::Counter;
 use porsmo::pomodoro::{PomoConfig, PomodoroMode as Mode, PomodoroSession as Session};
 
@@ -45,7 +49,8 @@ impl From<PomoConfig> for PomoState {
 }
 
 const CONTROLS: &str = "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume";
-const ENDING_CONTROLS: &str = "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume, [Enter]: Next";
+const ENDING_CONTROLS: &str =
+    "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume, [Enter]: Next";
 const SKIP_CONTROLS: &str = "[Enter]: Yes, [Q/N]: No";
 
 fn pomodoro_work_title(mode: Mode) -> &'static str {
@@ -190,10 +195,8 @@ impl CounterUIState for PomoState {
                     out,
                     MoveTo(0, 0),
                     Clear(ClearType::All),
-                    Print(skip_to.with(color)),
-                    MoveToNextLine(1),
-                    Print(round_number),
-                    MoveToNextLine(1),
+                    Print(skip_to.with(color)), MoveToNextLine(1),
+                    Print(round_number), MoveToNextLine(1),
                     Print(SKIP_CONTROLS)
                 )?;
             }
@@ -204,12 +207,12 @@ impl CounterUIState for PomoState {
                     out,
                     MoveTo(0, 0),
                     Clear(ClearType::All),
-                    Print(pomodoro_work_title(self.session.mode)),
-                    MoveToNextLine(1),
-                    Print(format_duration(&time_left).with(running_color(counter.started())),),
-                    MoveToNextLine(1),
-                    Print(CONTROLS),
-                    MoveToNextLine(1),
+                    Print(pomodoro_work_title(self.session.mode)), MoveToNextLine(1),
+                    Print(
+                        format_duration(&time_left)
+                            .with(running_color(counter.started())),
+                    ), MoveToNextLine(1),
+                    Print(CONTROLS), MoveToNextLine(1),
                     Print(round_number),
                 )?;
             }
@@ -221,15 +224,15 @@ impl CounterUIState for PomoState {
                     out,
                     MoveTo(0, 0),
                     Clear(ClearType::All),
-                    Print(pomodoro_break_title(self.session.next().mode)),
-                    MoveToNextLine(1),
-                    Print(format_args!(
-                        "+{}",
-                        format_duration(&excess_time).with(running_color(counter.started())),
-                    ),),
-                    MoveToNextLine(1),
-                    Print(ENDING_CONTROLS),
-                    MoveToNextLine(1),
+                    Print(pomodoro_break_title(self.session.next().mode)), MoveToNextLine(1),
+                    Print(
+                        format_args!(
+                            "+{}",
+                            format_duration(&excess_time)
+                                .with(running_color(counter.started())),
+                        ),
+                    ), MoveToNextLine(1),
+                    Print(ENDING_CONTROLS), MoveToNextLine(1),
                     Print(message),
                 )?;
             }
@@ -280,23 +283,24 @@ pub fn pomodoro(out: &mut impl Write, config: &PomoConfig) -> Result<()> {
     let stopwatch = Stopwatch::default();
     let mut session = Session::default();
     let mut ui_mode = UIMode::Running(stopwatch);
-    let mut alerted = false;
 
     loop {
-        pomodoro_show(out, config, &ui_mode, &session, &mut alerted)?;
+        pomodoro_show(out, config, &ui_mode, &session)?;
 
         if let Some(cmd) = get_event(TIMEOUT)?.map(Command::from) {
             match ui_mode {
-                UIMode::Skip(elapsed) => match cmd {
-                    Command::Quit | Command::No => {
-                        ui_mode = UIMode::Running(Stopwatch::new(Some(Instant::now()), elapsed))
+                UIMode::Skip(elapsed) => {
+                    match cmd {
+                        Command::Quit | Command::No =>
+                            ui_mode = UIMode::Running(Stopwatch::new(
+                                Some(Instant::now()), elapsed
+                            )),
+                        Command::Enter | Command::Yes => {
+                            ui_mode = UIMode::Running(Stopwatch::default());
+                            session = session.next();
+                        },
+                        _ => (),
                     }
-                    Command::Enter | Command::Yes => {
-                        alerted = false;
-                        ui_mode = UIMode::Running(Stopwatch::default());
-                        session = session.next();
-                    }
-                    _ => (),
                 },
                 UIMode::Running(ref mut stopwatch) => {
                     let elapsed = stopwatch.elapsed();
@@ -304,11 +308,11 @@ pub fn pomodoro(out: &mut impl Write, config: &PomoConfig) -> Result<()> {
 
                     match cmd {
                         Command::Quit => break,
+
                         Command::Enter if elapsed >= target_time => {
-                            alerted = false;
                             ui_mode = UIMode::Running(Stopwatch::default());
                             session = session.next();
-                        }
+                        },
                         Command::Pause => stopwatch.stop(),
                         Command::Resume => stopwatch.start(),
                         Command::Toggle => stopwatch.toggle(),
@@ -316,7 +320,7 @@ pub fn pomodoro(out: &mut impl Write, config: &PomoConfig) -> Result<()> {
 
                         _ => (),
                     }
-                }
+                },
             }
         }
     }
@@ -328,7 +332,6 @@ fn pomodoro_show(
     config: &PomoConfig,
     ui_mode: &UIMode,
     session: &Session,
-    alerted: &mut bool,
 ) -> Result<()> {
     let target = session.mode.current_target(config);
     let round_number = format!("Session: {}", session.number);
@@ -343,52 +346,44 @@ fn pomodoro_show(
                 out,
                 MoveTo(0, 0),
                 Clear(ClearType::All),
-                Print(skip_to.with(color)),
-                MoveToNextLine(1),
-                Print(round_number),
-                MoveToNextLine(1),
+                Print(skip_to.with(color)), MoveToNextLine(1),
+                Print(round_number), MoveToNextLine(1),
                 Print(SKIP_CONTROLS)
             )?;
         }
-        UIMode::Running(stopwatch) if stopwatch.elapsed() < target => {
+        UIMode::Running(stopwatch)  if stopwatch.elapsed() < target => {
             let time_left = target.saturating_sub(stopwatch.elapsed());
 
             queue!(
                 out,
                 MoveTo(0, 0),
                 Clear(ClearType::All),
-                Print(pomodoro_work_title(session.mode)),
-                MoveToNextLine(1),
-                Print(format_duration(&time_left).with(running_color(stopwatch.started())),),
-                MoveToNextLine(1),
-                Print(CONTROLS),
-                MoveToNextLine(1),
+                Print(pomodoro_work_title(session.mode)), MoveToNextLine(1),
+                Print(
+                    format_duration(&time_left)
+                        .with(running_color(stopwatch.started())),
+                ), MoveToNextLine(1),
+                Print(CONTROLS), MoveToNextLine(1),
                 Print(round_number),
             )?;
         }
         UIMode::Running(stopwatch) => {
             let excess_time = stopwatch.elapsed().saturating_sub(target);
-            let (title, message) = pomodoro_alert_message(session.next().mode);
-            if !*alerted {
-                *alerted = true;
-                alert(title, message);
-            }
+            let (_, message) = pomodoro_alert_message(session.next().mode);
 
             queue!(
                 out,
                 MoveTo(0, 0),
                 Clear(ClearType::All),
-                Print(pomodoro_break_title(session.next().mode)),
-                MoveToNextLine(1),
+                Print(pomodoro_break_title(session.next().mode)), MoveToNextLine(1),
                 Print(
-                    format!("+{}", format_duration(&excess_time),)
-                        .with(running_color(stopwatch.started()))
-                ),
-                MoveToNextLine(1),
-                Print(ENDING_CONTROLS),
-                MoveToNextLine(1),
-                Print(round_number),
-                MoveToNextLine(1),
+                    format_args!(
+                        "+{}",
+                        format_duration(&excess_time)
+                            .with(running_color(stopwatch.started())),
+                    ),
+                ), MoveToNextLine(1),
+                Print(ENDING_CONTROLS), MoveToNextLine(1),
                 Print(message),
             )?;
         }
