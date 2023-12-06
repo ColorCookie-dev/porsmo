@@ -9,28 +9,30 @@ mod stopwatch;
 mod terminal;
 mod timer;
 
+use std::io::Write;
+use crate::input::{Command, get_event, TIMEOUT};
 use clap::Parser;
 use cli::{Cli, CounterMode, PomoMode};
-use pomodoro::pomodoro;
-use crate::pomodoro::PomoConfig;
+use pomodoro::PomodoroUI;
+use crate::pomodoro::PomodoroConfig;
 use prelude::*;
-use stopwatch::stopwatch;
+use stopwatch::StopwatchUI;
 use terminal::TerminalHandler;
-use timer::timer;
+use timer::TimerUI;
 
 fn main() -> Result<()> {
     let args = Cli::parse();
     let mut terminal = TerminalHandler::new()?;
     let stdout = terminal.stdout();
     match args.mode {
-        Some(CounterMode::Stopwatch { start_time }) => stopwatch(stdout, start_time)?,
-        Some(CounterMode::Timer { target }) => timer(stdout, target)?,
+        Some(CounterMode::Stopwatch) => StopwatchUI::default().run_ui(stdout)?,
+        Some(CounterMode::Timer { target }) => TimerUI::new(target).run_ui(stdout)?,
         Some(CounterMode::Pomodoro {
             mode: PomoMode::Short,
-        }) => pomodoro(stdout, &PomoConfig::short())?,
+        }) => PomodoroUI::new(PomodoroConfig::short()).run_ui(stdout)?,
         Some(CounterMode::Pomodoro {
             mode: PomoMode::Long,
-        }) => pomodoro(stdout, &PomoConfig::long())?,
+        }) => PomodoroUI::new(PomodoroConfig::long()).run_ui(stdout)?,
         Some(CounterMode::Pomodoro {
             mode:
                 PomoMode::Custom {
@@ -38,8 +40,28 @@ fn main() -> Result<()> {
                     break_time,
                     long_break,
                 },
-        }) => pomodoro(stdout, &PomoConfig::new(work_time, break_time, long_break))?,
-        None => pomodoro(stdout, &PomoConfig::short())?,
+        }) => PomodoroUI::new(
+            PomodoroConfig::new(work_time, break_time, long_break)
+        ).run_ui(stdout)?,
+        None => PomodoroUI::new(PomodoroConfig::short()).run_ui(stdout)?,
     }
     Ok(())
 }
+
+pub trait CounterUI: Sized {
+    fn show(&mut self, out: &mut impl Write) -> Result<()>;
+    fn update(&mut self, command: Command);
+    fn run_ui(mut self, out: &mut impl Write) -> Result<()> {
+        loop {
+            self.show(out)?;
+            if let Some(cmd) = get_event(TIMEOUT)?.map(Command::from) {
+                match cmd {
+                    Command::Quit => break,
+                    cmd => self.update(cmd),
+                }
+            }
+        }
+        Ok(())
+    }
+}
+

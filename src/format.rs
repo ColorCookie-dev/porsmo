@@ -1,8 +1,10 @@
 use std::time::Duration;
+use std::borrow::Borrow;
 
 use crate::prelude::*;
 
-pub fn format_duration(dur: &Duration) -> String {
+pub fn format_duration(dur: impl Borrow<Duration>) -> String {
+    let dur = dur.borrow();
     let total_secs = dur.as_secs();
     let secs = total_secs % 60;
     let mins = ((total_secs - secs) % (60 * 60)) / 60;

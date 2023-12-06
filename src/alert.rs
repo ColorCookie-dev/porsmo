@@ -28,6 +28,28 @@ pub fn alert(title: impl Into<String>, message: impl Into<String>) {
     });
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Alerter(bool);
+
+impl Default for Alerter {
+    fn default() -> Self {
+        Self(false)
+    }
+}
+
+impl Alerter {
+    pub fn alert_once(&mut self, title: impl Into<String>, message: impl Into<String>) {
+        if !self.0 {
+            self.0 = true;
+            alert(title, message);
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.0 = false;
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum SoundError {
     #[error(transparent)]

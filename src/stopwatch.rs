@@ -1,8 +1,7 @@
 use std::time::Instant;
 use std::{io::Write, time::Duration};
 
-use crate::input::{get_event, TIMEOUT};
-use crate::prelude::*;
+use crate::{prelude::*, CounterUI};
 use crate::terminal::running_color;
 use crate::{format::format_duration, input::Command};
 use crossterm::{
@@ -12,6 +11,7 @@ use crossterm::{
     terminal::{Clear, ClearType},
 };
 
+#[derive(Debug, Clone, Copy)]
 pub struct Stopwatch {
     start_time: Option<Instant>,
     elapsed_before: Duration,
@@ -75,30 +75,36 @@ impl Stopwatch {
     }
 }
 
-pub fn stopwatch(out: &mut impl Write, start_time: Duration) -> Result<()> {
-    let mut counter = Stopwatch::new(Some(Instant::now()), start_time);
-    loop {
+#[derive(Debug, Clone, Copy, Default)]
+pub struct StopwatchUI {
+    stopwatch: Stopwatch,
+}
+
+impl CounterUI for StopwatchUI {
+    fn show(&mut self, out: &mut impl Write) -> Result<()> {
+        let elapsed = self.stopwatch.elapsed();
+        let is_running = self.stopwatch.started();
         queue!(
             out,
             MoveTo(0, 0),
             Clear(ClearType::All),
             Print("Stopwatch"),
             MoveToNextLine(1),
-            Print(format_duration(&counter.elapsed()).with(running_color(counter.started()))),
+            Print(format_duration(elapsed).with(running_color(is_running))),
             MoveToNextLine(1),
             Print("[Q]: quit, [Space]: pause/resume"),
         )?;
         out.flush()?;
-        if let Some(cmd) = get_event(TIMEOUT)?.map(Command::from) {
-            match cmd {
-                Command::Quit => break,
-                Command::Pause => counter.stop(),
-                Command::Resume => counter.start(),
-                Command::Toggle | Command::Enter => counter.toggle(),
-                _ => (),
-            }
-        }
+        Ok(())
     }
 
-    Ok(())
+    fn update(&mut self, command: Command) {
+        match command {
+            Command::Pause => self.stopwatch.stop(),
+            Command::Resume => self.stopwatch.start(),
+            Command::Toggle | Command::Enter => self.stopwatch.toggle(),
+            _ => (),
+        }
+    }
 }
+
