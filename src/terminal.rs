@@ -1,7 +1,6 @@
 use crate::{error::PorsmoError, prelude::*};
 use crossterm::{
-    cursor::MoveTo,
-    event::{DisableMouseCapture, EnableMouseCapture},
+    cursor::{MoveTo, Hide, Show},
     execute,
     style::Color,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -19,7 +18,7 @@ impl TerminalHandler {
         execute!(
             &mut stdout,
             EnterAlternateScreen,
-            EnableMouseCapture,
+            Hide,
             Clear(ClearType::All),
             MoveTo(0, 0),
         )
@@ -39,7 +38,7 @@ impl Drop for TerminalHandler {
         execute!(
             stdout(),
             Clear(ClearType::All),
-            DisableMouseCapture,
+            Show,
             LeaveAlternateScreen,
         )
         .expect("Failed to reset screen");
