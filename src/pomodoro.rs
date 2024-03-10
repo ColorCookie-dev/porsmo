@@ -224,7 +224,6 @@ fn pomodoro_show(
             queue!(
                 out,
                 MoveTo(0, 0),
-                Clear(ClearType::All),
                 Print(skip_to.with(color)),
                 MoveToNextLine(1),
                 Print(round_number),
@@ -238,7 +237,6 @@ fn pomodoro_show(
             queue!(
                 out,
                 MoveTo(0, 0),
-                Clear(ClearType::All),
                 Print(default_title(session.mode)),
                 MoveToNextLine(1),
                 Print(format_duration(&time_left).with(running_color(stopwatch.started())),),
@@ -256,7 +254,6 @@ fn pomodoro_show(
             queue!(
                 out,
                 MoveTo(0, 0),
-                Clear(ClearType::All),
                 Print(end_title(session.next().mode)),
                 MoveToNextLine(1),
                 Print(
