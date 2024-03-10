@@ -238,6 +238,7 @@ fn pomodoro_show(
             queue!(
                 out,
                 MoveTo(0, 0),
+                Clear(ClearType::FromCursorDown),
                 Print(default_title(session.mode)),
                 MoveToNextLine(1),
                 Print(format_duration(&time_left).with(running_color(stopwatch.started())),),
@@ -255,6 +256,7 @@ fn pomodoro_show(
             queue!(
                 out,
                 MoveTo(0, 0),
+                Clear(ClearType::FromCursorDown),
                 Print(end_title(session.next().mode)),
                 MoveToNextLine(1),
                 Print(
