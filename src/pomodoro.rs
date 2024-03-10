@@ -224,6 +224,7 @@ fn pomodoro_show(
             queue!(
                 out,
                 MoveTo(0, 0),
+                Clear(ClearType::FromCursorDown),
                 Print(skip_to.with(color)),
                 MoveToNextLine(1),
                 Print(round_number),
