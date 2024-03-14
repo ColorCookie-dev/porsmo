@@ -224,12 +224,14 @@ fn pomodoro_show(
             queue!(
                 out,
                 MoveTo(0, 0),
-                Clear(ClearType::All),
                 Print(skip_to.with(color)),
+                Clear(ClearType::UntilNewLine),
                 MoveToNextLine(1),
                 Print(round_number),
+                Clear(ClearType::UntilNewLine),
                 MoveToNextLine(1),
-                Print(SKIP_CONTROLS)
+                Print(SKIP_CONTROLS),
+                Clear(ClearType::FromCursorDown),
             )?;
         }
         UIMode::Running(stopwatch) if stopwatch.elapsed() < target => {
@@ -238,14 +240,17 @@ fn pomodoro_show(
             queue!(
                 out,
                 MoveTo(0, 0),
-                Clear(ClearType::All),
                 Print(default_title(session.mode)),
+                Clear(ClearType::UntilNewLine),
                 MoveToNextLine(1),
                 Print(format_duration(&time_left).with(running_color(stopwatch.started())),),
+                Clear(ClearType::UntilNewLine),
                 MoveToNextLine(1),
                 Print(CONTROLS),
+                Clear(ClearType::UntilNewLine),
                 MoveToNextLine(1),
                 Print(round_number),
+                Clear(ClearType::FromCursorDown),
             )?;
         }
         UIMode::Running(stopwatch) => {
@@ -256,19 +261,23 @@ fn pomodoro_show(
             queue!(
                 out,
                 MoveTo(0, 0),
-                Clear(ClearType::All),
                 Print(end_title(session.next().mode)),
+                Clear(ClearType::UntilNewLine),
                 MoveToNextLine(1),
                 Print(
                     format!("+{}", format_duration(&excess_time),)
                         .with(running_color(stopwatch.started()))
                 ),
+                Clear(ClearType::UntilNewLine),
                 MoveToNextLine(1),
                 Print(ENDING_CONTROLS),
+                Clear(ClearType::UntilNewLine),
                 MoveToNextLine(1),
                 Print(round_number),
+                Clear(ClearType::UntilNewLine),
                 MoveToNextLine(1),
                 Print(message),
+                Clear(ClearType::FromCursorDown),
             )?;
         }
     }

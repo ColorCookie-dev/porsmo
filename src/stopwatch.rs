@@ -87,12 +87,14 @@ impl CounterUI for StopwatchUI {
         queue!(
             out,
             MoveTo(0, 0),
-            Clear(ClearType::All),
             Print("Stopwatch"),
+            Clear(ClearType::UntilNewLine),
             MoveToNextLine(1),
             Print(format_duration(elapsed).with(running_color(is_running))),
+            Clear(ClearType::UntilNewLine),
             MoveToNextLine(1),
             Print("[Q]: quit, [Space]: pause/resume"),
+            Clear(ClearType::FromCursorDown),
         )?;
         out.flush()?;
         Ok(())

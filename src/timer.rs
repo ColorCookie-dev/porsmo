@@ -44,13 +44,16 @@ fn timer_show(
     queue!(
         out,
         MoveTo(0, 0),
-        Clear(ClearType::All),
         Print(title),
+        Clear(ClearType::UntilNewLine),
         MoveToNextLine(1),
         Print(timer),
+        Clear(ClearType::UntilNewLine),
         MoveToNextLine(1),
         Print(controls),
-        MoveToNextLine(1)
+        Clear(ClearType::UntilNewLine),
+        MoveToNextLine(1),
+        Clear(ClearType::FromCursorDown),
     )?;
     out.flush()?;
     Ok(())
