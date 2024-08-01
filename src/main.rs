@@ -24,14 +24,16 @@ fn main() -> Result<()> {
     let args = Cli::parse();
     let mut terminal = TerminalHandler::new()?;
     let stdout = terminal.stdout();
-    let exitmessage = match args.mode {
+    let exitmessagestring = match args.mode {
         Some(CounterMode::Stopwatch) => StopwatchUI::default().run_ui(stdout)?,
         Some(CounterMode::Timer { target }) => TimerUI::new(target).run_ui(stdout)?,
         Some(CounterMode::Pomodoro {
             mode: PomoMode::Short,
+            exitmessage: _,
         }) => PomodoroUI::new(PomodoroConfig::short()).run_ui(stdout)?,
         Some(CounterMode::Pomodoro {
             mode: PomoMode::Long,
+            exitmessage: _,
         }) => PomodoroUI::new(PomodoroConfig::long()).run_ui(stdout)?,
         Some(CounterMode::Pomodoro {
             mode:
@@ -40,11 +42,20 @@ fn main() -> Result<()> {
                     break_time,
                     long_break,
                 },
+            exitmessage: _,
         }) => PomodoroUI::new(PomodoroConfig::new(work_time, break_time, long_break))
             .run_ui(stdout)?,
         None => PomodoroUI::new(PomodoroConfig::short()).run_ui(stdout)?,
     };
-    terminal.set_exit_message(exitmessage.clone());
+    if matches!(
+        args.mode,
+        Some(CounterMode::Pomodoro {
+            mode: _,
+            exitmessage: true
+        })
+    ) {
+        terminal.set_exit_message(exitmessagestring.clone());
+    }
     Ok(())
 }
 

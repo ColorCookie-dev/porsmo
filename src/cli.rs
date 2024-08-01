@@ -35,6 +35,9 @@ pub enum CounterMode {
     Pomodoro {
         #[clap(subcommand, name = "mode")]
         mode: PomoMode,
+        ///Display a message after quitting the pomodoro timer
+        #[arg(short, name = "exitmessage")]
+        exitmessage: bool,
     },
 }
 
