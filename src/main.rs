@@ -9,13 +9,13 @@ mod stopwatch;
 mod terminal;
 mod timer;
 
-use std::io::Write;
-use crate::input::{Command, get_event, TIMEOUT};
+use crate::input::{get_event, Command, TIMEOUT};
+use crate::pomodoro::PomodoroConfig;
 use clap::Parser;
 use cli::{Cli, CounterMode, PomoMode};
 use pomodoro::PomodoroUI;
-use crate::pomodoro::PomodoroConfig;
 use prelude::*;
+use std::io::Write;
 use stopwatch::StopwatchUI;
 use terminal::TerminalHandler;
 use timer::TimerUI;
@@ -24,7 +24,7 @@ fn main() -> Result<()> {
     let args = Cli::parse();
     let mut terminal = TerminalHandler::new()?;
     let stdout = terminal.stdout();
-    match args.mode {
+    let exitmessage = match args.mode {
         Some(CounterMode::Stopwatch) => StopwatchUI::default().run_ui(stdout)?,
         Some(CounterMode::Timer { target }) => TimerUI::new(target).run_ui(stdout)?,
         Some(CounterMode::Pomodoro {
@@ -40,18 +40,18 @@ fn main() -> Result<()> {
                     break_time,
                     long_break,
                 },
-        }) => PomodoroUI::new(
-            PomodoroConfig::new(work_time, break_time, long_break)
-        ).run_ui(stdout)?,
+        }) => PomodoroUI::new(PomodoroConfig::new(work_time, break_time, long_break))
+            .run_ui(stdout)?,
         None => PomodoroUI::new(PomodoroConfig::short()).run_ui(stdout)?,
-    }
+    };
+    terminal.set_exit_message(exitmessage.clone());
     Ok(())
 }
 
 pub trait CounterUI: Sized {
     fn show(&mut self, out: &mut impl Write) -> Result<()>;
     fn update(&mut self, command: Command);
-    fn run_ui(mut self, out: &mut impl Write) -> Result<()> {
+    fn run_ui(mut self, out: &mut impl Write) -> Result<String> {
         loop {
             self.show(out)?;
             if let Some(cmd) = get_event(TIMEOUT)?.map(Command::from) {
@@ -61,7 +61,6 @@ pub trait CounterUI: Sized {
                 }
             }
         }
-        Ok(())
+        Ok(String::new())
     }
 }
-

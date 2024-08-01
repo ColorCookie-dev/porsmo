@@ -1,4 +1,5 @@
 use crate::alert::Alerter;
+use crate::input::{get_event, TIMEOUT};
 use crate::stopwatch::Stopwatch;
 use crate::terminal::running_color;
 use crate::{format::format_duration, input::Command};
@@ -70,6 +71,7 @@ impl PomodoroConfig {
 pub struct Session {
     pub mode: Mode,
     pub round: u32,
+    pub elapsed_time: [Duration; 2],
 }
 
 impl Default for Session {
@@ -77,26 +79,34 @@ impl Default for Session {
         Self {
             mode: Mode::default(),
             round: 1,
+            elapsed_time: [Duration::ZERO; 2],
         }
     }
 }
 
 impl Session {
-    pub fn next(self) -> Self {
+    pub fn advance(self, duration: Duration) -> Self {
         match self.mode {
             Mode::Work if self.round % 4 == 0 => Self {
                 mode: Mode::LongBreak,
+                elapsed_time: [self.elapsed_time[0] + duration, self.elapsed_time[1]],
                 ..self
             },
             Mode::Work => Self {
                 mode: Mode::Break,
+                elapsed_time: [self.elapsed_time[0] + duration, self.elapsed_time[1]],
                 ..self
             },
             Mode::Break | Mode::LongBreak => Self {
                 mode: Mode::Work,
                 round: self.round + 1,
+                elapsed_time: [self.elapsed_time[0], self.elapsed_time[1] + duration],
             },
         }
+    }
+
+    pub fn next(&self) -> Self {
+        self.advance(Duration::ZERO)
     }
 }
 
@@ -150,19 +160,55 @@ pub struct PomodoroUI {
 
 impl PomodoroUI {
     pub fn new(config: PomodoroConfig) -> Self {
-        Self { config, ..Default::default() }
+        Self {
+            config,
+            ..Default::default()
+        }
     }
 }
 
 impl CounterUI for PomodoroUI {
     fn show(&mut self, out: &mut impl Write) -> Result<()> {
-        pomodoro_show(out, &self.config, &self.ui_mode,
-                      &self.session, &mut self.alerter)
+        pomodoro_show(
+            out,
+            &self.config,
+            &self.ui_mode,
+            &self.session,
+            &mut self.alerter,
+        )
     }
 
     fn update(&mut self, command: Command) {
-        pomodoro_update(command, &self.config,
-                        &mut self.alerter, &mut self.ui_mode, &mut self.session);
+        pomodoro_update(
+            command,
+            &self.config,
+            &mut self.alerter,
+            &mut self.ui_mode,
+            &mut self.session,
+        );
+    }
+
+    fn run_ui(mut self, out: &mut impl Write) -> Result<String> {
+        loop {
+            self.show(out)?;
+            if let Some(cmd) = get_event(TIMEOUT)?.map(Command::from) {
+                match cmd {
+                    Command::Quit => {
+                        self.session = match self.ui_mode {
+                            UIMode::Skip(elapsed) => self.session.advance(elapsed),
+                            UIMode::Running(stopwatch) => self.session.advance(stopwatch.elapsed()),
+                        };
+                        break;
+                    }
+                    cmd => self.update(cmd),
+                }
+            }
+        }
+        Ok(format!(
+            "You have spent {} working and {} on break. Well done!",
+            format_duration(self.session.elapsed_time[0]),
+            format_duration(self.session.elapsed_time[1]),
+        ))
     }
 }
 
@@ -180,8 +226,8 @@ fn pomodoro_update(
             }
             Command::Enter | Command::Yes => {
                 alerter.reset();
+                *session = session.advance(*elapsed);
                 *ui_mode = UIMode::Running(Stopwatch::default());
-                *session = session.next();
             }
             _ => (),
         },
@@ -192,8 +238,8 @@ fn pomodoro_update(
             match command {
                 Command::Enter if elapsed >= target => {
                     alerter.reset();
+                    *session = session.advance(elapsed);
                     *ui_mode = UIMode::Running(Stopwatch::default());
-                    *session = session.next();
                 }
                 Command::Pause => stopwatch.stop(),
                 Command::Resume => stopwatch.start(),
