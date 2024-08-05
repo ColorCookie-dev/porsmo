@@ -47,6 +47,7 @@ fn main() -> Result<()> {
             .run_ui(stdout)?,
         None => PomodoroUI::new(PomodoroConfig::short()).run_ui(stdout)?,
     };
+    drop(terminal);
     if matches!(
         args.mode,
         Some(CounterMode::Pomodoro {
@@ -54,7 +55,7 @@ fn main() -> Result<()> {
             exitmessage: true
         })
     ) {
-        terminal.set_exit_message(exitmessagestring.clone());
+        println!("{}", exitmessagestring);
     }
     Ok(())
 }

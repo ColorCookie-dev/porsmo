@@ -2,7 +2,7 @@ use crate::{error::PorsmoError, prelude::*};
 use crossterm::{
     cursor::{Hide, MoveTo, Show},
     execute,
-    style::{Color, Print},
+    style::Color,
     terminal::{
         disable_raw_mode, enable_raw_mode, Clear, ClearType, EnterAlternateScreen,
         LeaveAlternateScreen,
@@ -10,7 +10,7 @@ use crossterm::{
 };
 use std::io::{stdout, Stdout};
 
-pub struct TerminalHandler(Stdout, String);
+pub struct TerminalHandler(Stdout);
 
 impl TerminalHandler {
     pub fn new() -> Result<Self> {
@@ -26,29 +26,19 @@ impl TerminalHandler {
         )
         .map_err(PorsmoError::FailedInitialization)?;
 
-        Ok(Self(stdout, String::new()))
+        Ok(Self(stdout))
     }
 
     pub fn stdout(&mut self) -> &mut Stdout {
         &mut self.0
-    }
-
-    pub fn set_exit_message(&mut self, s: String) {
-        self.1 = s;
     }
 }
 
 impl Drop for TerminalHandler {
     fn drop(&mut self) {
         disable_raw_mode().expect("Failed to disable raw mode");
-        execute!(
-            stdout(),
-            Clear(ClearType::All),
-            Show,
-            LeaveAlternateScreen,
-            Print(self.1.clone())
-        )
-        .expect("Failed to reset screen");
+        execute!(stdout(), Clear(ClearType::All), Show, LeaveAlternateScreen,)
+            .expect("Failed to reset screen");
     }
 }
 
