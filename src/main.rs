@@ -1,5 +1,6 @@
 mod alert;
 mod cli;
+mod config;
 mod error;
 mod format;
 mod input;
@@ -13,6 +14,7 @@ use crate::input::{get_event, Command, TIMEOUT};
 use crate::pomodoro::PomodoroConfig;
 use clap::Parser;
 use cli::{Cli, CounterMode, PomoMode};
+use config::AppConfig;
 use pomodoro::PomodoroUI;
 use prelude::*;
 use std::io::Write;
@@ -22,6 +24,9 @@ use timer::TimerUI;
 
 fn main() -> Result<()> {
     let args = Cli::parse();
+    let app_config = AppConfig::load();
+    #[cfg(debug_assertions)]
+    eprintln!("[DEBUG] Loaded config: short_break={:?}, long_break={:?}, long_break_frequency={:?}", app_config.short_break, app_config.long_break, app_config.long_break_frequency);
     let mut terminal = TerminalHandler::new()?;
     let stdout = terminal.stdout();
     let exitmessagestring = match args.mode {
@@ -30,11 +35,11 @@ fn main() -> Result<()> {
         Some(CounterMode::Pomodoro {
             mode: PomoMode::Short,
             exitmessage: _,
-        }) => PomodoroUI::new(PomodoroConfig::short()).run_ui(stdout)?,
+        }) => PomodoroUI::new(PomodoroConfig::short_with_config(&app_config)).run_ui(stdout)?,
         Some(CounterMode::Pomodoro {
             mode: PomoMode::Long,
             exitmessage: _,
-        }) => PomodoroUI::new(PomodoroConfig::long()).run_ui(stdout)?,
+        }) => PomodoroUI::new(PomodoroConfig::long_with_config(&app_config)).run_ui(stdout)?,
         Some(CounterMode::Pomodoro {
             mode:
                 PomoMode::Custom {
@@ -43,9 +48,9 @@ fn main() -> Result<()> {
                     long_break,
                 },
             exitmessage: _,
-        }) => PomodoroUI::new(PomodoroConfig::new(work_time, break_time, long_break))
+        }) => PomodoroUI::new(PomodoroConfig::new_with_config(work_time, break_time, long_break, &app_config))
             .run_ui(stdout)?,
-        None => PomodoroUI::new(PomodoroConfig::short()).run_ui(stdout)?,
+        None => PomodoroUI::new(PomodoroConfig::short_with_config(&app_config)).run_ui(stdout)?,
     };
     drop(terminal);
     if matches!(

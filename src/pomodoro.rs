@@ -8,6 +8,7 @@ use crossterm::cursor::{MoveTo, MoveToNextLine};
 use crossterm::style::Print;
 use crossterm::terminal::{Clear, ClearType};
 use crossterm::{queue, style::Color, style::Stylize};
+use crate::config::AppConfig;
 
 use std::io::Write;
 use std::time::{Duration, Instant};
@@ -25,6 +26,7 @@ pub struct PomodoroConfig {
     pub work_time: Duration,
     pub break_time: Duration,
     pub long_break: Duration,
+    pub long_break_frequency: u32,
 }
 
 impl Default for PomodoroConfig {
@@ -34,11 +36,12 @@ impl Default for PomodoroConfig {
 }
 
 impl PomodoroConfig {
-    pub fn new(work_time: Duration, break_time: Duration, long_break: Duration) -> Self {
+    pub fn new_with_config(work_time: Duration, break_time: Duration, long_break: Duration, config: &AppConfig) -> Self {
         Self {
             work_time,
             break_time,
             long_break,
+            long_break_frequency: config.long_break_frequency.unwrap_or(4),
         }
     }
 
@@ -47,14 +50,25 @@ impl PomodoroConfig {
             work_time: Duration::from_secs(25 * 60),
             break_time: Duration::from_secs(5 * 60),
             long_break: Duration::from_secs(10 * 60),
+            long_break_frequency: 4,
         }
     }
 
-    pub fn long() -> Self {
+    pub fn short_with_config(config: &AppConfig) -> Self {
         Self {
-            work_time: Duration::from_secs(55 * 60),
-            break_time: Duration::from_secs(10 * 60),
-            long_break: Duration::from_secs(20 * 60),
+            work_time: config.work_time.unwrap_or(Duration::from_secs(25 * 60)),
+            break_time: config.short_break.unwrap_or(Duration::from_secs(5 * 60)),
+            long_break: config.long_break.unwrap_or(Duration::from_secs(10 * 60)),
+            long_break_frequency: config.long_break_frequency.unwrap_or(4),
+        }
+    }
+
+    pub fn long_with_config(config: &AppConfig) -> Self {
+        Self {
+            work_time: config.work_time.unwrap_or(Duration::from_secs(55 * 60)),
+            break_time: config.short_break.unwrap_or(Duration::from_secs(10 * 60)),
+            long_break: config.long_break.unwrap_or(Duration::from_secs(20 * 60)),
+            long_break_frequency: config.long_break_frequency.unwrap_or(4),
         }
     }
 
@@ -85,9 +99,9 @@ impl Default for Session {
 }
 
 impl Session {
-    pub fn advance(self, duration: Duration) -> Self {
+    pub fn advance_with_freq(self, duration: Duration, freq: u32) -> Self {
         match self.mode {
-            Mode::Work if self.round % 4 == 0 => Self {
+            Mode::Work if self.round % freq == 0 => Self {
                 mode: Mode::LongBreak,
                 elapsed_time: [self.elapsed_time[0] + duration, self.elapsed_time[1]],
                 ..self
@@ -105,8 +119,8 @@ impl Session {
         }
     }
 
-    pub fn next(&self) -> Self {
-        self.advance(Duration::ZERO)
+    pub fn next_with_freq(&self, freq: u32) -> Self {
+        self.advance_with_freq(Duration::ZERO, freq)
     }
 }
 
@@ -195,8 +209,8 @@ impl CounterUI for PomodoroUI {
                 match cmd {
                     Command::Quit => {
                         self.session = match self.ui_mode {
-                            UIMode::Skip(elapsed) => self.session.advance(elapsed),
-                            UIMode::Running(stopwatch) => self.session.advance(stopwatch.elapsed()),
+                            UIMode::Skip(elapsed) => self.session.advance_with_freq(elapsed, self.config.long_break_frequency),
+                            UIMode::Running(stopwatch) => self.session.advance_with_freq(stopwatch.elapsed(), self.config.long_break_frequency),
                         };
                         break;
                     }
@@ -226,7 +240,7 @@ fn pomodoro_update(
             }
             Command::Enter | Command::Yes => {
                 alerter.reset();
-                *session = session.advance(*elapsed);
+                *session = session.advance_with_freq(*elapsed, config.long_break_frequency);
                 *ui_mode = UIMode::Running(Stopwatch::default());
             }
             _ => (),
@@ -238,7 +252,7 @@ fn pomodoro_update(
             match command {
                 Command::Enter if elapsed >= target => {
                     alerter.reset();
-                    *session = session.advance(elapsed);
+                    *session = session.advance_with_freq(elapsed, config.long_break_frequency);
                     *ui_mode = UIMode::Running(Stopwatch::default());
                 }
                 Command::Pause => stopwatch.stop(),
@@ -262,7 +276,7 @@ fn pomodoro_show(
     let round_number = format!("Session: {}", session.round);
     match ui_mode {
         UIMode::Skip(..) => {
-            let (color, skip_to) = match session.next().mode {
+            let (color, skip_to) = match session.next_with_freq(config.long_break_frequency).mode {
                 Mode::Work => (Color::Red, "skip to work?"),
                 Mode::Break => (Color::Green, "skip to break?"),
                 Mode::LongBreak => (Color::Green, "skip to long break?"),
@@ -301,13 +315,13 @@ fn pomodoro_show(
         }
         UIMode::Running(stopwatch) => {
             let excess_time = stopwatch.elapsed().saturating_sub(target);
-            let (title, message) = alert_message(session.next().mode);
+            let (title, message) = alert_message(session.next_with_freq(config.long_break_frequency).mode);
             alerter.alert_once(title, message);
 
             queue!(
                 out,
                 MoveTo(0, 0),
-                Print(end_title(session.next().mode)),
+                Print(end_title(session.next_with_freq(config.long_break_frequency).mode)),
                 Clear(ClearType::UntilNewLine),
                 MoveToNextLine(1),
                 Print(
