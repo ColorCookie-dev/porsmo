@@ -64,6 +64,7 @@ fn timer_update(command: Command, stopwatch: &mut Stopwatch) {
         Command::Pause => stopwatch.stop(),
         Command::Resume => stopwatch.start(),
         Command::Toggle | Command::Enter => stopwatch.toggle(),
+        Command::Reset => *stopwatch = Stopwatch::default(),
         _ => (),
     }
 }
@@ -77,7 +78,10 @@ pub struct TimerUI {
 
 impl TimerUI {
     pub fn new(target: Duration) -> Self {
-        Self { target, ..Default::default() }
+        Self {
+            target,
+            ..Default::default()
+        }
     }
 }
 
@@ -92,4 +96,3 @@ impl CounterUI for TimerUI {
         timer_update(command, &mut self.stopwatch)
     }
 }
-
