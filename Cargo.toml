@@ -18,3 +18,5 @@ rodio = "0.12.0"
 crossterm = "0.26.1"
 clap = { version = "4.3.0", features = ["derive"] }
 thiserror = "1.0.43"
+toml = "0.8"
+dirs = "5.0"
