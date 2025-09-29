@@ -110,8 +110,9 @@ impl Session {
     }
 }
 
-const CONTROLS: &str = "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume";
-const ENDING_CONTROLS: &str = "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume, [Enter]: Next";
+const CONTROLS: &str = "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume, [R]: reset";
+const ENDING_CONTROLS: &str =
+    "[Q]: quit, [Shift S]: Skip, [Space]: pause/resume, [Enter]: Next, [R]: reset";
 const SKIP_CONTROLS: &str = "[Enter]: Yes, [Q/N]: No";
 
 fn default_title(mode: Mode) -> &'static str {
@@ -245,6 +246,7 @@ fn pomodoro_update(
                 Command::Resume => stopwatch.start(),
                 Command::Toggle => stopwatch.toggle(),
                 Command::Skip => *ui_mode = UIMode::Skip(elapsed),
+                Command::Reset => *stopwatch = Stopwatch::default(),
                 _ => (),
             }
         }

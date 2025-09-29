@@ -7,6 +7,7 @@ pub enum Command {
     Quit,
     Pause,
     Resume,
+    Reset,
     Toggle,
     Enter,
     Skip,
@@ -93,6 +94,12 @@ impl From<KeyEvent> for Command {
                 modifiers: KeyModifiers::NONE,
                 ..
             } => Self::Resume,
+            KeyEvent {
+                code: KeyCode::Char('r'),
+                kind: KeyEventKind::Press,
+                modifiers: KeyModifiers::NONE,
+                ..
+            } => Self::Reset,
             _ => Self::Invalid,
         }
     }
