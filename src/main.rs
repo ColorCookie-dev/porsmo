@@ -1,11 +1,9 @@
-mod alert;
 mod cli;
 mod clock;
 mod format;
 mod prelude;
 mod terminal;
 
-use crate::alert::{alert, play_bell};
 use crate::clock::Clock;
 use crate::format::{format_duration, format_duration_short};
 use crate::prelude::*;
@@ -18,13 +16,13 @@ use crossterm::queue;
 use crossterm::style::{Color, Print, Stylize};
 use crossterm::terminal::{Clear, ClearType};
 use notify_rust::Notification;
-use rodio::{Decoder, OutputStream, OutputStreamBuilder, Sink};
+use rodio::OutputStreamBuilder;
 use std::fmt::Display;
-use std::{io::Cursor, thread};
-use std::{io::Write, time::Duration};
+use std::{io::BufReader, io::Cursor, io::Write, time::Duration};
 use terminal::TerminalHandler;
 
 pub const TIMEOUT: Duration = Duration::from_millis(250);
+const FILE: &'static [u8] = include_bytes!("notify_end.wav");
 
 fn main() -> Result<()> {
     let args = Cli::parse();
@@ -60,15 +58,6 @@ fn main() -> Result<()> {
         }) => pomodoro_loop(work_time, break_time, long_break)?,
     };
 
-    // if matches!(
-    //     args.mode,
-    //     Some(CounterMode::Pomodoro {
-    //         mode: _,
-    //         exitmessage: true
-    //     })
-    // ) {
-    //     println!("{}", exitmessagestring);
-    // }
     Ok(())
 }
 
@@ -107,12 +96,6 @@ pub fn stopwatch_loop() -> Result<()> {
                     ..
                 } => clock.toggle(),
 
-                // KeyEvent {
-                //     code: KeyCode::Enter,
-                //     kind: KeyEventKind::Press,
-                //     modifiers: KeyModifiers::NONE,
-                //     ..
-                // } => clock.toggle(),
                 _ => continue,
             }
         }
@@ -120,7 +103,10 @@ pub fn stopwatch_loop() -> Result<()> {
 
     drop(terminal);
 
-    println!("Stopwatch ended at: {}.", format_duration_short(clock.elapsed()));
+    println!(
+        "Stopwatch ended at: {}.",
+        format_duration_short(clock.elapsed())
+    );
 
     Ok(())
 }
@@ -130,22 +116,35 @@ pub fn timer_loop(target: Duration) -> Result<()> {
     let output = terminal.stdout();
     let mut clock = Clock::default();
     let mut alerted = false;
+    let mut stream_handle = OutputStreamBuilder::open_default_stream()?;
+    stream_handle.log_on_drop(false);
+    let mut _sink;
 
     loop {
         let elapsed = clock.elapsed();
         let color = running_color(clock.is_running());
         let timer_ended = elapsed >= target;
+        const CONTROLS: &str = "[Q]: quit, [Space]: pause/resume, [R]: Reset";
         if timer_ended {
             if !alerted {
                 alerted = true;
-                play_bell()?;
+                let file = BufReader::new(Cursor::new(FILE));
+                _sink = rodio::play(stream_handle.mixer(), file)?;
+                // alert(
+                //     &stream_handle,
+                //     "Porsmo Timer",
+                //     format!(
+                //         "Your timer of {} has ended!",
+                //         format_duration_short(target),
+                //     ),
+                // )?;
             }
             let excess_time = format_duration(elapsed.saturating_sub(target));
             show_ui(
                 output,
                 "Timer has ended".with(Color::Red),
                 format!("+{excess_time}").with(color),
-                "[Q]: quit, [Space]: pause/resume, [R]: Reset",
+                CONTROLS,
             )?;
         } else {
             let time_left = target.saturating_sub(elapsed);
@@ -153,7 +152,7 @@ pub fn timer_loop(target: Duration) -> Result<()> {
                 output,
                 "Timer",
                 format_duration(time_left).with(color),
-                "[Q]: Quit, [Space]: Pause/Resume, [R]: Reset",
+                CONTROLS,
             )?;
         }
         if event::poll(TIMEOUT)? {
@@ -207,6 +206,7 @@ pub fn pomodoro_loop(
     long_break_time: Duration,
 ) -> Result<()> {
     let mut terminal = TerminalHandler::new()?;
+    let mut alerted = false;
     let output = terminal.stdout();
     let mut worked_time = Duration::ZERO;
     let mut rested_time = Duration::ZERO;
@@ -214,6 +214,9 @@ pub fn pomodoro_loop(
     let mut session = 1;
     let mut mode = Mode::Work;
     let mut is_skip_pressed = false;
+    let mut stream_handle = OutputStreamBuilder::open_default_stream()?;
+    stream_handle.log_on_drop(false);
+    let mut _sink;
 
     loop {
         let elapsed = clock.elapsed();
@@ -240,14 +243,25 @@ pub fn pomodoro_loop(
                 session,
             )?,
 
-            Mode::Work => show_pomo_ui(
+            Mode::Work => {
                 // Work Ended
-                output,
-                "Time for a break!".with(Color::Red),
-                format!("+{}", format_duration(elapsed.saturating_sub(work_time))).with(color),
-                END_PROMPT,
-                session,
-            )?,
+                if !alerted {
+                    alerted = true;
+                    let file = BufReader::new(Cursor::new(FILE));
+                    _sink = rodio::play(stream_handle.mixer(), file)?;
+                    // alert(
+                    //     &stream_handle,
+                    //     "Pomodoro Ended",
+                    //     "Time for a break!")?;
+                }
+                show_pomo_ui(
+                    output,
+                    "Time for a break!".with(Color::Red),
+                    format!("+{}", format_duration(elapsed.saturating_sub(work_time))).with(color),
+                    END_PROMPT,
+                    session,
+                )?
+            }
 
             Mode::Break if elapsed < break_time => show_pomo_ui(
                 output,
@@ -257,14 +271,24 @@ pub fn pomodoro_loop(
                 session,
             )?,
 
-            Mode::Break => show_pomo_ui(
+            Mode::Break => {
                 // Break time ended
-                output,
-                "Time to start working!".with(Color::Red),
-                format!("+{}", format_duration(elapsed.saturating_sub(break_time))).with(color),
-                END_PROMPT,
-                session,
-            )?,
+                if !alerted {
+                    alerted = true;
+                    let file = BufReader::new(Cursor::new(FILE));
+                    _sink = rodio::play(stream_handle.mixer(), file)?;
+                    // alert(&stream_handle,
+                    //     "Break Ended",
+                    //     "Time to start working!")?;
+                }
+                show_pomo_ui(
+                    output,
+                    "Time to start working!".with(Color::Red),
+                    format!("+{}", format_duration(elapsed.saturating_sub(break_time))).with(color),
+                    END_PROMPT,
+                    session,
+                )?
+            }
 
             Mode::LongBreak if elapsed < long_break_time => show_pomo_ui(
                 output,
@@ -274,18 +298,28 @@ pub fn pomodoro_loop(
                 session,
             )?,
 
-            Mode::LongBreak => show_pomo_ui(
+            Mode::LongBreak => {
                 // Long break ended
-                output,
-                "Time to start working!".with(Color::Red),
-                format!(
-                    "+{}",
-                    format_duration(elapsed.saturating_sub(long_break_time))
-                )
-                .with(color),
-                END_PROMPT,
-                session,
-            )?,
+                if !alerted {
+                    alerted = true;
+                    let file = BufReader::new(Cursor::new(FILE));
+                    _sink = rodio::play(stream_handle.mixer(), file)?;
+                    // alert(&stream_handle,
+                    //     "Break Ended",
+                    //     "Time to start working!")?;
+                }
+                show_pomo_ui(
+                    output,
+                    "Time to start working!".with(Color::Red),
+                    format!(
+                        "+{}",
+                        format_duration(elapsed.saturating_sub(long_break_time))
+                    )
+                    .with(color),
+                    END_PROMPT,
+                    session,
+                )?
+            }
         };
 
         if event::poll(TIMEOUT)? {
@@ -328,19 +362,25 @@ pub fn pomodoro_loop(
                         match mode {
                             Mode::Work if session % 4 == 0 => {
                                 mode = Mode::LongBreak;
-                                worked_time += clock.elapsed();
+                                worked_time += work_time;
                             }
                             Mode::Work => {
                                 mode = Mode::Break;
-                                worked_time += clock.elapsed();
+                                worked_time += break_time;
                             }
-                            Mode::Break | Mode::LongBreak => {
+                            Mode::Break => {
                                 mode = Mode::Work;
                                 session += 1;
-                                rested_time += clock.elapsed();
+                                rested_time += break_time;
+                            }
+                            Mode::LongBreak => {
+                                mode = Mode::Work;
+                                session += 1;
+                                rested_time += long_break_time;
                             }
                         }
                         clock.reset();
+                        alerted = false;
                     }
 
                     KeyEvent {
@@ -385,14 +425,14 @@ pub fn pomodoro_loop(
                             modifiers: KeyModifiers::NONE,
                             ..
                         } if elapsed >= work_time => {
-                            // Next
                             if session % 4 == 0 {
                                 mode = Mode::LongBreak;
                             } else {
                                 mode = Mode::Break;
                             }
-                            worked_time += clock.elapsed();
+                            worked_time += work_time;
                             clock.reset();
+                            alerted = false;
                         }
 
                         KeyEvent {
@@ -437,8 +477,9 @@ pub fn pomodoro_loop(
                         } if elapsed >= break_time => {
                             mode = Mode::Work;
                             session += 1;
-                            rested_time += clock.elapsed();
+                            rested_time += break_time;
                             clock.reset();
+                            alerted = false;
                         }
 
                         KeyEvent {
@@ -483,8 +524,9 @@ pub fn pomodoro_loop(
                         } if elapsed >= long_break_time => {
                             mode = Mode::Work;
                             session += 1;
-                            rested_time += clock.elapsed();
+                            rested_time += long_break_time;
                             clock.reset();
+                            alerted = false;
                         }
 
                         KeyEvent {
@@ -566,10 +608,21 @@ pub fn show_pomo_ui(
     Ok(())
 }
 
-// pub fn pomo_alert_message(next_mode: PomoMode) -> (&'static str, &'static str) {
-//     match next_mode {
-//         Mode::Work => ("Your break ended!", "Time for some work"),
-//         Mode::Break => ("Pomodoro ended!", "Time for a short break"),
-//         Mode::LongBreak => ("Pomodoro 4 sessions complete!", "Time for a long break"),
-//     };
+// pub fn alert(
+//     stream_handle: &OutputStream,
+//     title: impl AsRef<str>,
+//     message: impl AsRef<str>
+// ) -> Result<()> {
+//     // notifica::notify("Porsmo", "Your Timer is Up!").unwrap();
+//     Ok(())
+// }
+
+// pub fn notify_default(title: impl AsRef<str>, message: impl AsRef<str>) -> Result<()> {
+//     notify_rust::Notification::new()
+//         .appname("Porsmo")
+//         .summary("Porsmo Update")
+//         .summary("Your Timer is Up!")
+//         .timeout(6000)
+//         .show()?;
+//     Ok(())
 // }
