@@ -7,7 +7,7 @@ mod terminal;
 
 use crate::alert::{alert, play_bell};
 use crate::clock::Clock;
-use crate::format::format_duration;
+use crate::format::{format_duration, format_duration_short};
 use crate::prelude::*;
 use crate::terminal::running_color;
 use clap::Parser;
@@ -28,18 +28,15 @@ pub const TIMEOUT: Duration = Duration::from_millis(250);
 
 fn main() -> Result<()> {
     let args = Cli::parse();
-    let mut terminal = TerminalHandler::new()?;
-    let stdout = terminal.stdout();
     // let exitmessagestring = match args.mode {
     match args.mode {
-        Some(CounterMode::Stopwatch) => stopwatch_loop(stdout)?,
-        Some(CounterMode::Countdown { target }) => timer_loop(stdout, target)?,
+        Some(CounterMode::Stopwatch) => stopwatch_loop()?,
+        Some(CounterMode::Countdown { target }) => timer_loop(target)?,
         Some(CounterMode::Pomodoro {
             mode: PomoMode::Short,
             exitmessage: _,
         })
         | None => pomodoro_loop(
-            stdout,
             Duration::from_secs(25 * 60),
             Duration::from_secs(5 * 60),
             Duration::from_secs(10 * 60),
@@ -48,7 +45,6 @@ fn main() -> Result<()> {
             mode: PomoMode::Long,
             exitmessage: _,
         }) => pomodoro_loop(
-            stdout,
             Duration::from_secs(50 * 60),
             Duration::from_secs(10 * 60),
             Duration::from_secs(20 * 60),
@@ -61,7 +57,7 @@ fn main() -> Result<()> {
                     long_break,
                 },
             exitmessage: _,
-        }) => pomodoro_loop(stdout, work_time, break_time, long_break)?,
+        }) => pomodoro_loop(work_time, break_time, long_break)?,
     };
 
     // if matches!(
@@ -76,7 +72,9 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-pub fn stopwatch_loop(output: &mut impl Write) -> Result<()> {
+pub fn stopwatch_loop() -> Result<()> {
+    let mut terminal = TerminalHandler::new()?;
+    let output = terminal.stdout();
     let mut clock = Clock::default();
 
     loop {
@@ -119,10 +117,17 @@ pub fn stopwatch_loop(output: &mut impl Write) -> Result<()> {
             }
         }
     }
+
+    drop(terminal);
+
+    println!("Stopwatch ended at: {}.", format_duration_short(clock.elapsed()));
+
     Ok(())
 }
 
-pub fn timer_loop(output: &mut impl Write, target: Duration) -> Result<()> {
+pub fn timer_loop(target: Duration) -> Result<()> {
+    let mut terminal = TerminalHandler::new()?;
+    let output = terminal.stdout();
     let mut clock = Clock::default();
     let mut alerted = false;
 
@@ -159,18 +164,21 @@ pub fn timer_loop(output: &mut impl Write, target: Duration) -> Result<()> {
                     modifiers: KeyModifiers::NONE,
                     ..
                 }) => break,
+
                 Event::Key(KeyEvent {
                     code: KeyCode::Char(' '),
                     kind: KeyEventKind::Press,
                     modifiers: KeyModifiers::NONE,
                     ..
                 }) => clock.toggle(),
+
                 Event::Key(KeyEvent {
                     code: KeyCode::Enter,
                     kind: KeyEventKind::Press,
                     modifiers: KeyModifiers::NONE,
                     ..
                 }) => clock.toggle(),
+
                 Event::Key(KeyEvent {
                     code: KeyCode::Char('r'),
                     kind: KeyEventKind::Press,
@@ -179,6 +187,7 @@ pub fn timer_loop(output: &mut impl Write, target: Duration) -> Result<()> {
                 }) => {
                     clock.reset();
                 }
+
                 _ => continue,
             }
         }
@@ -193,11 +202,14 @@ pub enum Mode {
 }
 
 pub fn pomodoro_loop(
-    output: &mut impl Write,
     work_time: Duration,
     break_time: Duration,
     long_break_time: Duration,
 ) -> Result<()> {
+    let mut terminal = TerminalHandler::new()?;
+    let output = terminal.stdout();
+    let mut worked_time = Duration::ZERO;
+    let mut rested_time = Duration::ZERO;
     let mut clock = Clock::default();
     let mut session = 1;
     let mut mode = Mode::Work;
@@ -219,6 +231,7 @@ pub fn pomodoro_loop(
                 SKIP_PROMPT,
                 session,
             )?,
+
             Mode::Work if elapsed < work_time => show_pomo_ui(
                 output,
                 "Pomodoro (Work)",
@@ -226,6 +239,7 @@ pub fn pomodoro_loop(
                 POMO_PROMPT,
                 session,
             )?,
+
             Mode::Work => show_pomo_ui(
                 // Work Ended
                 output,
@@ -234,6 +248,7 @@ pub fn pomodoro_loop(
                 END_PROMPT,
                 session,
             )?,
+
             Mode::Break if elapsed < break_time => show_pomo_ui(
                 output,
                 "Enjoy your break!".with(Color::Blue),
@@ -241,6 +256,7 @@ pub fn pomodoro_loop(
                 POMO_PROMPT,
                 session,
             )?,
+
             Mode::Break => show_pomo_ui(
                 // Break time ended
                 output,
@@ -249,6 +265,7 @@ pub fn pomodoro_loop(
                 END_PROMPT,
                 session,
             )?,
+
             Mode::LongBreak if elapsed < long_break_time => show_pomo_ui(
                 output,
                 "Give your mind some rest!".with(Color::Blue),
@@ -256,6 +273,7 @@ pub fn pomodoro_loop(
                 POMO_PROMPT,
                 session,
             )?,
+
             Mode::LongBreak => show_pomo_ui(
                 // Long break ended
                 output,
@@ -310,13 +328,16 @@ pub fn pomodoro_loop(
                         match mode {
                             Mode::Work if session % 4 == 0 => {
                                 mode = Mode::LongBreak;
+                                worked_time += clock.elapsed();
                             }
                             Mode::Work => {
                                 mode = Mode::Break;
+                                worked_time += clock.elapsed();
                             }
                             Mode::Break | Mode::LongBreak => {
                                 mode = Mode::Work;
                                 session += 1;
+                                rested_time += clock.elapsed();
                             }
                         }
                         clock.reset();
@@ -370,6 +391,7 @@ pub fn pomodoro_loop(
                             } else {
                                 mode = Mode::Break;
                             }
+                            worked_time += clock.elapsed();
                             clock.reset();
                         }
 
@@ -415,6 +437,7 @@ pub fn pomodoro_loop(
                         } if elapsed >= break_time => {
                             mode = Mode::Work;
                             session += 1;
+                            rested_time += clock.elapsed();
                             clock.reset();
                         }
 
@@ -460,6 +483,7 @@ pub fn pomodoro_loop(
                         } if elapsed >= long_break_time => {
                             mode = Mode::Work;
                             session += 1;
+                            rested_time += clock.elapsed();
                             clock.reset();
                         }
 
@@ -483,6 +507,14 @@ pub fn pomodoro_loop(
             }
         }
     }
+    drop(terminal);
+
+    println!(
+        "You have worked for {}, and rested {}.",
+        format_duration_short(worked_time),
+        format_duration_short(rested_time),
+    );
+
     Ok(())
 }
 

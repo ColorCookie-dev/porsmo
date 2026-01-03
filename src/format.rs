@@ -3,13 +3,30 @@ use std::time::Duration;
 
 use crate::prelude::*;
 
-pub fn format_duration(dur: impl Borrow<Duration>) -> String {
+pub fn format_duration(dur: Duration) -> String {
     let dur = dur.borrow();
     let total_secs = dur.as_secs();
     let secs = total_secs % 60;
     let mins = ((total_secs - secs) % (60 * 60)) / 60;
     let hours = (total_secs - mins * 60 - secs) / (60 * 60);
     format!("{hours}h {mins}m {secs}s")
+}
+
+pub fn format_duration_short(dur: Duration) -> String {
+    let dur = dur.borrow();
+    let total_secs = dur.as_secs();
+    let secs = total_secs % 60;
+    let mins = ((total_secs - secs) % (60 * 60)) / 60;
+    let hours = (total_secs - mins * 60 - secs) / (60 * 60);
+    if hours == 0 {
+        if mins == 0 {
+            format!("{secs}s")
+        } else {
+            format!("{mins}m {secs}s")
+        }
+    } else {
+        format!("{hours}h {mins}m {secs}s")
+    }
 }
 
 pub fn parse_duration(text: &str) -> Result<Duration> {
