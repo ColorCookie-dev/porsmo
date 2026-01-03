@@ -15,7 +15,6 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifier
 use crossterm::queue;
 use crossterm::style::{Color, Print, Stylize};
 use crossterm::terminal::{Clear, ClearType};
-use notify_rust::Notification;
 use rodio::OutputStreamBuilder;
 use std::fmt::Display;
 use std::{io::BufReader, io::Cursor, io::Write, time::Duration};
@@ -172,13 +171,6 @@ pub fn timer_loop(target: Duration) -> Result<()> {
                 }) => clock.toggle(),
 
                 Event::Key(KeyEvent {
-                    code: KeyCode::Enter,
-                    kind: KeyEventKind::Press,
-                    modifiers: KeyModifiers::NONE,
-                    ..
-                }) => clock.toggle(),
-
-                Event::Key(KeyEvent {
                     code: KeyCode::Char('r'),
                     kind: KeyEventKind::Press,
                     modifiers: KeyModifiers::NONE,
@@ -216,13 +208,15 @@ pub fn pomodoro_loop(
     let mut is_skip_pressed = false;
     let mut stream_handle = OutputStreamBuilder::open_default_stream()?;
     stream_handle.log_on_drop(false);
+
+    // Makes sure that the sink doesn't disappear after the iteration.
     let mut _sink;
 
     loop {
         let elapsed = clock.elapsed();
         let color = running_color(clock.is_running());
 
-        const SKIP_PROMPT: &str = "[Q]: Quit, [Enter/Y]: Yes, [N/Esc]: No";
+        const SKIP_PROMPT: &str = "[Q]: Quit, [Enter/Y]: Yes, [Esc/N]: No";
         const POMO_PROMPT: &str = "[Q]: Quit, [S]: Skip, [Space]: Pause/Resume, [R]: Reset";
         const END_PROMPT: &str = "[Q]: Quit, [Enter]: Next, [Space]: Pause/Resume, [R]: Reset";
 

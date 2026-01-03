@@ -1,6 +1,6 @@
 [package]
 name = "porsmo"
-version = "0.3.4"
+version = "0.3.5"
 edition = "2021"
 readme = "README.md"
 license = "MIT"
@@ -15,8 +15,5 @@ categories = ["command-line-utilities"]
 [dependencies]
 crossterm = "0.26.1"
 anyhow = "1.0.100"
-notify-rust = "4.11.7"
 clap = { version = "4.5.53", features = ["derive"] }
 rodio = { version = "0.21.1", features = ["wav", "playback"] }
-mac-notification-sys = "0.6.9"
-notifica = "3.0.2"
