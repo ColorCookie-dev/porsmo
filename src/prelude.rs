@@ -1,3 +1,2 @@
-pub use crate::error::PorsmoError;
-
-pub type Result<T> = core::result::Result<T, PorsmoError>;
+pub use anyhow::{anyhow, Context};
+pub type Result<T> = anyhow::Result<T>;

@@ -13,8 +13,10 @@ categories = ["command-line-utilities"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-notify-rust = "4"
-rodio = "0.12.0"
 crossterm = "0.26.1"
-clap = { version = "4.3.0", features = ["derive"] }
-thiserror = "1.0.43"
+anyhow = "1.0.100"
+notify-rust = "4.11.7"
+clap = { version = "4.5.53", features = ["derive"] }
+rodio = "0.21.1"
+mac-notification-sys = "0.6.9"
+notifica = "3.0.2"

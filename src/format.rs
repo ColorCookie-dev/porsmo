@@ -1,5 +1,5 @@
-use std::time::Duration;
 use std::borrow::Borrow;
+use std::time::Duration;
 
 use crate::prelude::*;
 
@@ -17,7 +17,7 @@ pub fn parse_duration(text: &str) -> Result<Duration> {
         Some((hours, rest)) => {
             let hours = hours.parse::<u64>()?;
             (Duration::from_secs(hours * 3600), rest)
-        },
+        }
         None => (Duration::ZERO, text),
     };
 
@@ -25,7 +25,7 @@ pub fn parse_duration(text: &str) -> Result<Duration> {
         Some((mins, text)) => {
             let mins = mins.parse::<u64>()?;
             (Duration::from_secs(mins * 60), text)
-        },
+        }
         None => (Duration::ZERO, text),
     };
 
@@ -33,9 +33,9 @@ pub fn parse_duration(text: &str) -> Result<Duration> {
         Some((secs, "")) => {
             let secs = secs.parse::<u64>()?;
             (Duration::from_secs(secs), text)
-        },
-        None if text == "" => (Duration::ZERO, ""),
-        _ => return Err(PorsmoError::WrongFormatError),
+        }
+        None if text.is_empty() => (Duration::ZERO, ""),
+        _ => return Err(anyhow!("Wrong format for time provided.")),
     };
 
     Ok(hours + mins + secs)

@@ -1,4 +1,4 @@
-use crate::{error::PorsmoError, prelude::*};
+use crate::prelude::*;
 use crossterm::{
     cursor::{Hide, MoveTo, Show},
     execute,
@@ -14,7 +14,7 @@ pub struct TerminalHandler(Stdout);
 
 impl TerminalHandler {
     pub fn new() -> Result<Self> {
-        enable_raw_mode().map_err(PorsmoError::FailedRawModeEnter)?;
+        enable_raw_mode().context("Failed to enter raw mode!")?;
 
         let mut stdout = std::io::stdout();
         execute!(
@@ -24,7 +24,7 @@ impl TerminalHandler {
             Clear(ClearType::All),
             MoveTo(0, 0),
         )
-        .map_err(PorsmoError::FailedInitialization)?;
+        .context("Failed to initialize the terminal!")?;
 
         Ok(Self(stdout))
     }
