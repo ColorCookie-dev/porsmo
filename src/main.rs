@@ -72,7 +72,7 @@ pub fn stopwatch_loop() -> Result<()> {
             output,
             "Stopwatch",
             format_duration(elapsed).with(color),
-            "[Q]: quit, [Space]: Pause/Resume",
+            "[Q]: quit, [Space]: Pause/Resume, [R]: Reset",
         )?;
         if event::poll(TIMEOUT)? {
             let key = match event::read()? {
@@ -94,6 +94,13 @@ pub fn stopwatch_loop() -> Result<()> {
                     modifiers: KeyModifiers::NONE,
                     ..
                 } => clock.toggle(),
+
+                KeyEvent {
+                    code: KeyCode::Char('r'),
+                    kind: KeyEventKind::Press,
+                    modifiers: KeyModifiers::NONE,
+                    ..
+                } => clock.reset(),
 
                 _ => continue,
             }
