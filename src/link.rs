@@ -1,6 +1,12 @@
+use crate::prelude::*;
+use clap::ValueEnum;
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use std::collections::VecDeque;
 use std::ffi::OsString;
 use std::io::{Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
+use std::str::FromStr;
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -37,17 +43,27 @@ pub struct Status {
     pub updated_ms: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum Command {
+    Toggle,
+    Reset,
+    Next,
+    Quit,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Request {
     pub method: String,
     pub path: String,
     pub host: Option<String>,
+    pub porsmo: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Route {
     Status,
     Events,
+    Command(Command),
     Reject(u16),
 }
 
@@ -96,6 +112,31 @@ pub fn needs_publish(prev: Option<&Status>, next: &Status) -> bool {
     expected.abs_diff(next.elapsed_ms) > DRIFT_TOLERANCE_MS
 }
 
+impl FromStr for Command {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        <Command as ValueEnum>::from_str(s.trim(), true).map_err(|e| anyhow!(e))
+    }
+}
+
+impl Command {
+    /// Returns the key presses that perform this command in the porsmo TUI.
+    pub fn keys(self) -> Vec<KeyEvent> {
+        let press = |code| KeyEvent::new_with_kind(code, KeyModifiers::NONE, KeyEventKind::Press);
+        match self {
+            Command::Toggle => vec![press(KeyCode::Char(' '))],
+            Command::Reset => vec![press(KeyCode::Char('r'))],
+            Command::Next => vec![
+                press(KeyCode::Char('s')),
+                press(KeyCode::Char('y')),
+                press(KeyCode::Enter),
+            ],
+            Command::Quit => vec![press(KeyCode::Char('q'))],
+        }
+    }
+}
+
 /// Resolves the HTTP port from a `PORSMO_PORT` value, defaulting to 7979.
 pub fn port_from(value: Option<OsString>) -> u16 {
     value
@@ -122,6 +163,7 @@ pub fn parse_request(head: &str) -> Option<Request> {
         method: method.to_owned(),
         path: target.split('?').next().unwrap_or(target).to_owned(),
         host: None,
+        porsmo: false,
     };
     for line in lines.take_while(|line| !line.is_empty()) {
         let Some((name, value)) = line.split_once(':') else {
@@ -130,6 +172,8 @@ pub fn parse_request(head: &str) -> Option<Request> {
         let name = name.trim();
         if name.eq_ignore_ascii_case("host") {
             request.host = Some(value.trim().to_owned());
+        } else if name.eq_ignore_ascii_case("x-porsmo") {
+            request.porsmo = true;
         }
     }
     Some(request)
@@ -150,7 +194,12 @@ pub fn route(request: &Request, port: u16) -> Route {
         "/status" if is_get => Route::Status,
         "/events" if is_get => Route::Events,
         "/status" | "/events" => Route::Reject(405),
-        _ => Route::Reject(404),
+        path => match path.strip_prefix('/').map(str::parse::<Command>) {
+            Some(Ok(_)) if request.method != "POST" => Route::Reject(405),
+            Some(Ok(_)) if !request.porsmo => Route::Reject(403),
+            Some(Ok(command)) => Route::Command(command),
+            _ => Route::Reject(404),
+        },
     }
 }
 
@@ -203,7 +252,7 @@ fn sse_frame(status: &Status) -> String {
     format!("data: {}\n\n", status_json(status))
 }
 
-fn handle(mut stream: TcpStream, port: u16, shared: &Mutex<Shared>) {
+fn handle(mut stream: TcpStream, port: u16, shared: &Mutex<Shared>, commands: &Sender<Command>) {
     if stream.set_read_timeout(Some(IO_TIMEOUT)).is_err()
         || stream.set_write_timeout(Some(IO_TIMEOUT)).is_err()
     {
@@ -232,6 +281,10 @@ fn handle(mut stream: TcpStream, port: u16, shared: &Mutex<Shared>) {
                 shared.subscribers.push(stream);
             }
         }
+        Route::Command(command) => match commands.send(command) {
+            Ok(()) => respond(&mut stream, 200, r#"{"ok":true}"#),
+            Err(_) => respond(&mut stream, 503, r#"{"error":"shutting down"}"#),
+        },
         Route::Reject(code) => {
             let body = serde_json::json!({ "error": reason(code) }).to_string();
             respond(&mut stream, code, &body);
@@ -239,20 +292,27 @@ fn handle(mut stream: TcpStream, port: u16, shared: &Mutex<Shared>) {
     }
 }
 
-fn serve(listener: TcpListener, port: u16, shared: Arc<Mutex<Shared>>) {
+fn serve(
+    listener: TcpListener,
+    port: u16,
+    shared: Arc<Mutex<Shared>>,
+    commands: Sender<Command>,
+) {
     for stream in listener.incoming() {
         if lock(&shared).closed {
             return;
         }
         if let Ok(stream) = stream {
-            handle(stream, port, &shared);
+            handle(stream, port, &shared, &commands);
         }
     }
 }
 
-/// Serves porsmo's state over a local HTTP API.
+/// Serves porsmo's state and accepts commands over a local HTTP API.
 pub struct Link {
     shared: Arc<Mutex<Shared>>,
+    commands: Option<Receiver<Command>>,
+    queue: VecDeque<Event>,
     port: Option<u16>,
 }
 
@@ -268,6 +328,8 @@ impl Link {
         }));
         let mut link = Self {
             shared: Arc::clone(&shared),
+            commands: None,
+            queue: VecDeque::new(),
             port: None,
         };
         let Ok(listener) = TcpListener::bind(("127.0.0.1", port)) else {
@@ -276,7 +338,9 @@ impl Link {
         let Ok(actual) = listener.local_addr().map(|addr| addr.port()) else {
             return link;
         };
-        thread::spawn(move || serve(listener, actual, shared));
+        let (sender, receiver) = mpsc::channel();
+        thread::spawn(move || serve(listener, actual, shared, sender));
+        link.commands = Some(receiver);
         link.port = Some(actual);
         link
     }
@@ -314,6 +378,34 @@ impl Link {
             shared.heartbeat = Instant::now();
         }
     }
+
+    /// Moves received commands into the key press queue.
+    pub fn drain(&mut self) {
+        let Some(commands) = &self.commands else {
+            return;
+        };
+        while let Ok(command) = commands.try_recv() {
+            self.queue.extend(command.keys().into_iter().map(Event::Key));
+        }
+    }
+
+    /// Pops the next queued key press, if any.
+    pub fn pop(&mut self) -> Option<Event> {
+        self.queue.pop_front()
+    }
+
+    /// Returns the next event, from an API command or from the terminal within `timeout`.
+    pub fn next_event(&mut self, timeout: Duration) -> Result<Option<Event>> {
+        self.drain();
+        if let Some(event) = self.pop() {
+            return Ok(Some(event));
+        }
+        if event::poll(timeout)? {
+            return Ok(Some(event::read()?));
+        }
+        self.drain();
+        Ok(self.pop())
+    }
 }
 
 impl Drop for Link {
@@ -348,6 +440,10 @@ mod tests {
     use super::*;
     use std::io::{BufRead, BufReader};
 
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new_with_kind(code, KeyModifiers::NONE, KeyEventKind::Press)
+    }
+
     fn status(running: bool, elapsed_ms: u64, updated_ms: u64) -> Status {
         Status {
             kind: Kind::Pomodoro,
@@ -365,7 +461,20 @@ mod tests {
             method: method.to_owned(),
             path: path.to_owned(),
             host: host.map(str::to_owned),
+            porsmo: false,
         }
+    }
+
+    fn post(port: u16, path: &str) -> String {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        write!(
+            stream,
+            "POST {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-Porsmo: 1\r\nConnection: close\r\n\r\n"
+        )
+        .unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).unwrap();
+        response
     }
 
     fn get(port: u16, path: &str) -> String {
@@ -402,6 +511,56 @@ mod tests {
                 return serde_json::from_str(data.trim()).unwrap();
             }
         }
+    }
+
+    fn wait_for_event(link: &mut Link) -> Option<Event> {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while Instant::now() < deadline {
+            link.drain();
+            if let Some(event) = link.pop() {
+                return Some(event);
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        None
+    }
+
+    #[test]
+    fn should_parse_toggle_command() {
+        assert_eq!("toggle".parse::<Command>().unwrap(), Command::Toggle);
+    }
+
+    #[test]
+    fn should_parse_command_with_surrounding_whitespace() {
+        assert_eq!(" next\n".parse::<Command>().unwrap(), Command::Next);
+    }
+
+    #[test]
+    fn should_reject_unknown_command() {
+        assert!("explode".parse::<Command>().is_err());
+    }
+
+    #[test]
+    fn should_map_toggle_to_space() {
+        assert_eq!(Command::Toggle.keys(), vec![key(KeyCode::Char(' '))]);
+    }
+
+    #[test]
+    fn should_map_reset_to_r() {
+        assert_eq!(Command::Reset.keys(), vec![key(KeyCode::Char('r'))]);
+    }
+
+    #[test]
+    fn should_map_next_to_skip_confirm_then_enter() {
+        assert_eq!(
+            Command::Next.keys(),
+            vec![key(KeyCode::Char('s')), key(KeyCode::Char('y')), key(KeyCode::Enter)]
+        );
+    }
+
+    #[test]
+    fn should_map_quit_to_q() {
+        assert_eq!(Command::Quit.keys(), vec![key(KeyCode::Char('q'))]);
     }
 
     #[test]
@@ -502,6 +661,18 @@ mod tests {
     }
 
     #[test]
+    fn should_detect_porsmo_header() {
+        let parsed = parse_request("POST /next HTTP/1.1\r\nx-porsmo: 1\r\n\r\n").unwrap();
+        assert!(parsed.porsmo);
+    }
+
+    #[test]
+    fn should_not_detect_porsmo_header_when_absent() {
+        let parsed = parse_request("POST /next HTTP/1.1\r\nHost: 127.0.0.1:7979\r\n\r\n").unwrap();
+        assert!(!parsed.porsmo);
+    }
+
+    #[test]
     fn should_reject_malformed_request_line() {
         assert_eq!(parse_request("garbage\r\n\r\n"), None);
     }
@@ -525,6 +696,21 @@ mod tests {
     }
 
     #[test]
+    fn should_route_post_command_with_porsmo_header() {
+        let req = Request {
+            porsmo: true,
+            ..request("POST", "/next", Some("127.0.0.1:7979"))
+        };
+        assert_eq!(route(&req, 7979), Route::Command(Command::Next));
+    }
+
+    #[test]
+    fn should_forbid_command_without_porsmo_header() {
+        let req = request("POST", "/quit", Some("127.0.0.1:7979"));
+        assert_eq!(route(&req, 7979), Route::Reject(403));
+    }
+
+    #[test]
     fn should_forbid_foreign_host() {
         let req = request("GET", "/status", Some("evil.example:7979"));
         assert_eq!(route(&req, 7979), Route::Reject(403));
@@ -540,6 +726,15 @@ mod tests {
     fn should_forbid_host_with_other_port() {
         let req = request("GET", "/status", Some("127.0.0.1:80"));
         assert_eq!(route(&req, 7979), Route::Reject(403));
+    }
+
+    #[test]
+    fn should_reject_get_on_command_path() {
+        let req = Request {
+            porsmo: true,
+            ..request("GET", "/toggle", Some("127.0.0.1:7979"))
+        };
+        assert_eq!(route(&req, 7979), Route::Reject(405));
     }
 
     #[test]
@@ -568,6 +763,22 @@ mod tests {
         let body = response.split("\r\n\r\n").nth(1).unwrap();
         let value: serde_json::Value = serde_json::from_str(body).unwrap();
         assert_eq!(value["elapsed_ms"], 1500);
+    }
+
+    #[test]
+    fn should_queue_keys_posted_to_command_path() {
+        let mut link = Link::open(0);
+        let port = link.port().unwrap();
+        let client = thread::spawn(move || post(port, "/toggle"));
+        let event = wait_for_event(&mut link);
+        client.join().unwrap();
+        assert_eq!(event, Some(Event::Key(key(KeyCode::Char(' ')))));
+    }
+
+    #[test]
+    fn should_answer_ok_to_accepted_command() {
+        let link = Link::open(0);
+        assert!(post(link.port().unwrap(), "/reset").starts_with("HTTP/1.1 200"));
     }
 
     #[test]

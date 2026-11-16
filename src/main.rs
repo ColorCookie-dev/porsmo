@@ -13,7 +13,7 @@ use crate::terminal::running_color;
 use clap::Parser;
 use cli::{Cli, CounterMode, PomoMode};
 use crossterm::cursor::{MoveTo, MoveToNextLine};
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crossterm::queue;
 use crossterm::style::{Color, Print, Stylize};
 use crossterm::terminal::{Clear, ClearType};
@@ -86,8 +86,8 @@ pub fn stopwatch_loop() -> Result<()> {
             format_duration(elapsed).with(color),
             "[Q]: quit, [Space]: Pause/Resume",
         )?;
-        if event::poll(TIMEOUT)? {
-            let key = match event::read()? {
+        if let Some(event) = link.next_event(TIMEOUT)? {
+            let key = match event {
                 Event::Key(key) => key,
                 _ => continue,
             };
@@ -176,8 +176,8 @@ pub fn timer_loop(target: Duration) -> Result<()> {
                 CONTROLS,
             )?;
         }
-        if event::poll(TIMEOUT)? {
-            match event::read()? {
+        if let Some(event) = link.next_event(TIMEOUT)? {
+            match event {
                 Event::Key(KeyEvent {
                     code: KeyCode::Char('q'),
                     kind: KeyEventKind::Press,
@@ -353,8 +353,8 @@ pub fn pomodoro_loop(
             }
         };
 
-        if event::poll(TIMEOUT)? {
-            let ev = match event::read()? {
+        if let Some(event) = link.next_event(TIMEOUT)? {
+            let ev = match event {
                 Event::Key(ev) => ev,
                 _ => continue,
             };
