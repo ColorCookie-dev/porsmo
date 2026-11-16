@@ -1,11 +1,13 @@
 mod cli;
 mod clock;
 mod format;
+mod link;
 mod prelude;
 mod terminal;
 
 use crate::clock::Clock;
 use crate::format::{format_duration, format_duration_short};
+use crate::link::{now_ms, port, Kind, Link, Phase, Status};
 use crate::prelude::*;
 use crate::terminal::running_color;
 use clap::Parser;
@@ -64,10 +66,20 @@ pub fn stopwatch_loop() -> Result<()> {
     let mut terminal = TerminalHandler::new()?;
     let output = terminal.stdout();
     let mut clock = Clock::default();
+    let mut link = Link::open(port());
 
     loop {
         let elapsed = clock.elapsed();
         let color = running_color(clock.is_running());
+        link.publish(Status {
+            kind: Kind::Stopwatch,
+            phase: None,
+            running: clock.is_running(),
+            target_ms: 0,
+            elapsed_ms: elapsed.as_millis() as u64,
+            session: 0,
+            updated_ms: now_ms(),
+        });
         show_ui(
             output,
             "Stopwatch",
@@ -118,11 +130,21 @@ pub fn timer_loop(target: Duration) -> Result<()> {
     let mut stream_handle = OutputStreamBuilder::open_default_stream()?;
     stream_handle.log_on_drop(false);
     let mut _sink;
+    let mut link = Link::open(port());
 
     loop {
         let elapsed = clock.elapsed();
         let color = running_color(clock.is_running());
         let timer_ended = elapsed >= target;
+        link.publish(Status {
+            kind: Kind::Timer,
+            phase: None,
+            running: clock.is_running(),
+            target_ms: target.as_millis() as u64,
+            elapsed_ms: elapsed.as_millis() as u64,
+            session: 0,
+            updated_ms: now_ms(),
+        });
         const CONTROLS: &str = "[Q]: quit, [Space]: pause/resume, [R]: Reset";
         if timer_ended {
             if !alerted {
@@ -211,10 +233,25 @@ pub fn pomodoro_loop(
 
     // Makes sure that the sink doesn't disappear after the iteration.
     let mut _sink;
+    let mut link = Link::open(port());
 
     loop {
         let elapsed = clock.elapsed();
         let color = running_color(clock.is_running());
+        let (phase, target) = match mode {
+            Mode::Work => (Phase::Work, work_time),
+            Mode::Break => (Phase::Break, break_time),
+            Mode::LongBreak => (Phase::LongBreak, long_break_time),
+        };
+        link.publish(Status {
+            kind: Kind::Pomodoro,
+            phase: Some(phase),
+            running: clock.is_running(),
+            target_ms: target.as_millis() as u64,
+            elapsed_ms: elapsed.as_millis() as u64,
+            session,
+            updated_ms: now_ms(),
+        });
 
         const SKIP_PROMPT: &str = "[Q]: Quit, [Enter/Y]: Yes, [Esc/N]: No";
         const POMO_PROMPT: &str = "[Q]: Quit, [S]: Skip, [Space]: Pause/Resume, [R]: Reset";
