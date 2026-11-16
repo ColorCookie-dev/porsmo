@@ -1,13 +1,16 @@
 use std::ffi::OsString;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub const DEFAULT_PORT: u16 = 7979;
+const DRIFT_TOLERANCE_MS: u64 = 500;
 const MAX_HEAD: usize = 8192;
 const IO_TIMEOUT: Duration = Duration::from_secs(1);
+const SUBSCRIBER_WRITE_TIMEOUT: Duration = Duration::from_millis(200);
+const HEARTBEAT: Duration = Duration::from_secs(15);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
@@ -44,6 +47,7 @@ pub struct Request {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Route {
     Status,
+    Events,
     Reject(u16),
 }
 
@@ -69,6 +73,27 @@ pub fn status_json(status: &Status) -> String {
         "updated_ms": status.updated_ms,
     })
     .to_string()
+}
+
+/// Returns true when `next` cannot be extrapolated from `prev` and must be pushed.
+pub fn needs_publish(prev: Option<&Status>, next: &Status) -> bool {
+    let Some(prev) = prev else {
+        return true;
+    };
+    if prev.kind != next.kind
+        || prev.phase != next.phase
+        || prev.running != next.running
+        || prev.target_ms != next.target_ms
+        || prev.session != next.session
+    {
+        return true;
+    }
+    let expected = if prev.running {
+        prev.elapsed_ms + next.updated_ms.saturating_sub(prev.updated_ms)
+    } else {
+        prev.elapsed_ms
+    };
+    expected.abs_diff(next.elapsed_ms) > DRIFT_TOLERANCE_MS
 }
 
 /// Resolves the HTTP port from a `PORSMO_PORT` value, defaulting to 7979.
@@ -123,13 +148,18 @@ pub fn route(request: &Request, port: u16) -> Route {
     let is_get = request.method == "GET";
     match request.path.as_str() {
         "/status" if is_get => Route::Status,
-        "/status" => Route::Reject(405),
+        "/events" if is_get => Route::Events,
+        "/status" | "/events" => Route::Reject(405),
         _ => Route::Reject(404),
     }
 }
 
 struct Shared {
     status: Option<Status>,
+    pushed: Option<Status>,
+    subscribers: Vec<TcpStream>,
+    heartbeat: Instant,
+    closed: bool,
 }
 
 fn lock(shared: &Mutex<Shared>) -> MutexGuard<'_, Shared> {
@@ -169,6 +199,10 @@ fn read_head(stream: &mut TcpStream) -> Option<String> {
     Some(String::from_utf8_lossy(&head).into_owned())
 }
 
+fn sse_frame(status: &Status) -> String {
+    format!("data: {}\n\n", status_json(status))
+}
+
 fn handle(mut stream: TcpStream, port: u16, shared: &Mutex<Shared>) {
     if stream.set_read_timeout(Some(IO_TIMEOUT)).is_err()
         || stream.set_write_timeout(Some(IO_TIMEOUT)).is_err()
@@ -184,6 +218,20 @@ fn handle(mut stream: TcpStream, port: u16, shared: &Mutex<Shared>) {
             Some(body) => respond(&mut stream, 200, &body),
             None => respond(&mut stream, 503, r#"{"error":"starting"}"#),
         },
+        Route::Events => {
+            let mut shared = lock(shared);
+            let mut opening = String::from(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-store\r\nConnection: keep-alive\r\n\r\n",
+            );
+            if let Some(status) = &shared.status {
+                opening.push_str(&sse_frame(status));
+            }
+            if stream.write_all(opening.as_bytes()).is_ok()
+                && stream.set_write_timeout(Some(SUBSCRIBER_WRITE_TIMEOUT)).is_ok()
+            {
+                shared.subscribers.push(stream);
+            }
+        }
         Route::Reject(code) => {
             let body = serde_json::json!({ "error": reason(code) }).to_string();
             respond(&mut stream, code, &body);
@@ -192,8 +240,13 @@ fn handle(mut stream: TcpStream, port: u16, shared: &Mutex<Shared>) {
 }
 
 fn serve(listener: TcpListener, port: u16, shared: Arc<Mutex<Shared>>) {
-    for stream in listener.incoming().flatten() {
-        handle(stream, port, &shared);
+    for stream in listener.incoming() {
+        if lock(&shared).closed {
+            return;
+        }
+        if let Ok(stream) = stream {
+            handle(stream, port, &shared);
+        }
     }
 }
 
@@ -206,7 +259,13 @@ pub struct Link {
 impl Link {
     /// Starts the API on `port` (0 picks a free one); it stays inert when the port is taken.
     pub fn open(port: u16) -> Self {
-        let shared = Arc::new(Mutex::new(Shared { status: None }));
+        let shared = Arc::new(Mutex::new(Shared {
+            status: None,
+            pushed: None,
+            subscribers: Vec::new(),
+            heartbeat: Instant::now(),
+            closed: false,
+        }));
         let mut link = Self {
             shared: Arc::clone(&shared),
             port: None,
@@ -233,12 +292,46 @@ impl Link {
         self.port.is_some()
     }
 
-    /// Records the current status served by `GET /status`.
+    /// Records the current status and pushes it to event subscribers when it changed.
     pub fn publish(&mut self, status: Status) {
         if !self.is_active() {
             return;
         }
-        lock(&self.shared).status = Some(status);
+        let mut shared = lock(&self.shared);
+        let frame = if needs_publish(shared.pushed.as_ref(), &status) {
+            shared.pushed = Some(status.clone());
+            Some(sse_frame(&status))
+        } else if shared.heartbeat.elapsed() >= HEARTBEAT {
+            Some(String::from(": ping\n\n"))
+        } else {
+            None
+        };
+        shared.status = Some(status);
+        if let Some(frame) = frame {
+            shared
+                .subscribers
+                .retain_mut(|subscriber| subscriber.write_all(frame.as_bytes()).is_ok());
+            shared.heartbeat = Instant::now();
+        }
+    }
+}
+
+impl Drop for Link {
+    fn drop(&mut self) {
+        let Some(port) = self.port else {
+            return;
+        };
+        {
+            let mut shared = lock(&self.shared);
+            shared.closed = true;
+            for subscriber in shared.subscribers.drain(..) {
+                let _ = subscriber.shutdown(Shutdown::Both);
+            }
+        }
+        let _ = TcpStream::connect_timeout(
+            &SocketAddr::from(([127, 0, 0, 1], port)),
+            Duration::from_millis(100),
+        );
     }
 }
 
@@ -253,6 +346,7 @@ pub fn now_ms() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{BufRead, BufReader};
 
     fn status(running: bool, elapsed_ms: u64, updated_ms: u64) -> Status {
         Status {
@@ -286,6 +380,30 @@ mod tests {
         response
     }
 
+    fn subscribe(port: u16) -> BufReader<TcpStream> {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        write!(
+            stream,
+            "GET /events HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n"
+        )
+        .unwrap();
+        BufReader::new(stream)
+    }
+
+    fn next_data(reader: &mut BufReader<TcpStream>) -> serde_json::Value {
+        let mut line = String::new();
+        loop {
+            line.clear();
+            reader.read_line(&mut line).unwrap();
+            if let Some(data) = line.strip_prefix("data: ") {
+                return serde_json::from_str(data.trim()).unwrap();
+            }
+        }
+    }
+
     #[test]
     fn should_serialize_status_fields() {
         let value: serde_json::Value =
@@ -311,6 +429,49 @@ mod tests {
         stopwatch.phase = None;
         let value: serde_json::Value = serde_json::from_str(&status_json(&stopwatch)).unwrap();
         assert!(value["phase"].is_null());
+    }
+
+    #[test]
+    fn should_publish_when_no_previous_status() {
+        assert!(needs_publish(None, &status(true, 0, 0)));
+    }
+
+    #[test]
+    fn should_not_publish_when_running_clock_follows_wall_clock() {
+        let prev = status(true, 1000, 10_000);
+        assert!(!needs_publish(Some(&prev), &status(true, 4000, 13_000)));
+    }
+
+    #[test]
+    fn should_not_publish_when_paused_clock_is_unchanged() {
+        let prev = status(false, 1000, 10_000);
+        assert!(!needs_publish(Some(&prev), &status(false, 1000, 60_000)));
+    }
+
+    #[test]
+    fn should_publish_when_running_state_changes() {
+        let prev = status(true, 1000, 10_000);
+        assert!(needs_publish(Some(&prev), &status(false, 1000, 10_000)));
+    }
+
+    #[test]
+    fn should_publish_when_clock_is_reset() {
+        let prev = status(true, 9000, 10_000);
+        assert!(needs_publish(Some(&prev), &status(true, 0, 10_250)));
+    }
+
+    #[test]
+    fn should_publish_when_wall_clock_jumps_ahead_of_clock() {
+        let prev = status(true, 1000, 10_000);
+        assert!(needs_publish(Some(&prev), &status(true, 2000, 600_000)));
+    }
+
+    #[test]
+    fn should_publish_when_phase_changes() {
+        let prev = status(true, 1000, 10_000);
+        let mut next = status(true, 1000, 10_000);
+        next.phase = Some(Phase::Break);
+        assert!(needs_publish(Some(&prev), &next));
     }
 
     #[test]
@@ -349,6 +510,12 @@ mod tests {
     fn should_route_get_status() {
         let req = request("GET", "/status", Some("127.0.0.1:7979"));
         assert_eq!(route(&req, 7979), Route::Status);
+    }
+
+    #[test]
+    fn should_route_get_events() {
+        let req = request("GET", "/events", Some("127.0.0.1:7979"));
+        assert_eq!(route(&req, 7979), Route::Events);
     }
 
     #[test]
@@ -408,5 +575,35 @@ mod tests {
         let taken = TcpListener::bind("127.0.0.1:0").unwrap();
         let link = Link::open(taken.local_addr().unwrap().port());
         assert!(!link.is_active());
+    }
+
+    #[test]
+    fn should_stream_current_status_on_subscribe() {
+        let mut link = Link::open(0);
+        link.publish(status(true, 1000, 10_000));
+        let mut events = subscribe(link.port().unwrap());
+        assert_eq!(next_data(&mut events)["elapsed_ms"], 1000);
+    }
+
+    #[test]
+    fn should_stream_status_changes_to_subscribers() {
+        let mut link = Link::open(0);
+        link.publish(status(true, 1000, 10_000));
+        let mut events = subscribe(link.port().unwrap());
+        next_data(&mut events);
+        link.publish(status(false, 1200, 10_200));
+        assert_eq!(next_data(&mut events)["running"], false);
+    }
+
+    #[test]
+    fn should_close_event_stream_when_link_is_dropped() {
+        let mut link = Link::open(0);
+        link.publish(status(true, 1000, 10_000));
+        let mut events = subscribe(link.port().unwrap());
+        next_data(&mut events);
+        drop(link);
+        let mut rest = String::new();
+        let reached_eof = events.read_to_string(&mut rest).is_ok();
+        assert!(reached_eof && rest.trim().is_empty());
     }
 }
