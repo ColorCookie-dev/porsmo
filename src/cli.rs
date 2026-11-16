@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use crate::format::parse_duration;
+use crate::link::Command;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -29,6 +30,12 @@ pub enum CounterMode {
         /// target time: example values 30m 20m 40m 2h25m30s
         #[arg(value_parser = parse_duration, value_name = "time")]
         target: Duration,
+    },
+    /// send a command to the running porsmo instance
+    #[command(name = "ctl")]
+    Ctl {
+        #[arg(value_enum)]
+        command: Command,
     },
     /// alias: p, pomodoro, for all you productivity needs (default)
     #[command(name = "pomodoro", alias = "p")]

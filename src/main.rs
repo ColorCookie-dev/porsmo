@@ -29,6 +29,7 @@ fn main() -> Result<()> {
     let args = Cli::parse();
     // let exitmessagestring = match args.mode {
     match args.mode {
+        Some(CounterMode::Ctl { command }) => link::send(port(), command)?,
         Some(CounterMode::Stopwatch) => stopwatch_loop()?,
         Some(CounterMode::Countdown { target }) => timer_loop(target)?,
         Some(CounterMode::Pomodoro {

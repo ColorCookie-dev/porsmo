@@ -135,6 +135,12 @@ impl Command {
             Command::Quit => vec![press(KeyCode::Char('q'))],
         }
     }
+
+    fn name(self) -> String {
+        self.to_possible_value()
+            .map(|value| value.get_name().to_owned())
+            .unwrap_or_default()
+    }
 }
 
 /// Resolves the HTTP port from a `PORSMO_PORT` value, defaulting to 7979.
@@ -200,6 +206,30 @@ pub fn route(request: &Request, port: u16) -> Route {
             Some(Ok(command)) => Route::Command(command),
             _ => Route::Reject(404),
         },
+    }
+}
+
+/// Sends a command to the porsmo instance listening on `port`.
+/// Example: send(port(), Command::Toggle)
+pub fn send(port: u16, command: Command) -> Result<()> {
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let mut stream = TcpStream::connect_timeout(&addr, IO_TIMEOUT)
+        .map_err(|_| anyhow!("porsmo is not running on port {port}"))?;
+    stream.set_read_timeout(Some(Duration::from_secs(2)))?;
+    write!(
+        stream,
+        "POST /{} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-Porsmo: 1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        command.name()
+    )?;
+    let mut response = String::new();
+    stream
+        .read_to_string(&mut response)
+        .context("porsmo did not answer")?;
+    let status_line = response.lines().next().unwrap_or_default();
+    if status_line.split_whitespace().nth(1) == Some("200") {
+        Ok(())
+    } else {
+        Err(anyhow!("porsmo answered: {status_line}"))
     }
 }
 
@@ -779,6 +809,26 @@ mod tests {
     fn should_answer_ok_to_accepted_command() {
         let link = Link::open(0);
         assert!(post(link.port().unwrap(), "/reset").starts_with("HTTP/1.1 200"));
+    }
+
+    #[test]
+    fn should_queue_keys_sent_by_ctl() {
+        let mut link = Link::open(0);
+        let port = link.port().unwrap();
+        let client = thread::spawn(move || send(port, Command::Toggle));
+        let event = wait_for_event(&mut link);
+        client.join().unwrap().unwrap();
+        assert_eq!(event, Some(Event::Key(key(KeyCode::Char(' ')))));
+    }
+
+    #[test]
+    fn should_fail_to_send_when_porsmo_is_not_running() {
+        let port = TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        assert!(send(port, Command::Toggle).is_err());
     }
 
     #[test]
